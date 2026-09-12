@@ -29,15 +29,8 @@ impl Entity {
         return z;
     }
 
-    pub fn distance_to(&self, other: &Entity) -> f32 {
-        return (
-            (self.position.x - other.position.x) * (self.position.x - other.position.x) + 
-            (self.position.y - other.position.y) * (self.position.y - other.position.y)
-        ).sqrt()
-    }
-
     pub fn intersects_with(&self, other: &Entity) -> bool {
-        let out = self.distance_to(other) < self.radius + other.radius;
+        let out = self.position.distance(other.position) < self.radius + other.radius;
         return out;
     }
 }
@@ -77,7 +70,7 @@ impl Engine {
 
     fn get_next_zombie_speed_vec(zombie: &Entity, gladiator: &Entity) -> Vec2 {
         let new_speed = gladiator.position - zombie.position;
-        return 0.2*(new_speed / new_speed.length());
+        return 0.2*new_speed.normalize();
     }
     pub fn move_gladiator(&mut self) {
         let old_pos = self.gladiator.position;
