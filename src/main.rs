@@ -107,7 +107,7 @@ impl Entity {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Field {
     width: f32,
     height: f32,
@@ -138,6 +138,19 @@ impl Engine {
         }
 
         return new_pos;
+    }
+
+    fn new(field: Field) -> Self {
+        let engine = Engine {
+            gladiator: Entity::GLADIATOR,
+            zombies: vec![
+                Entity::make_zombie(Vec2 { x: 200.0, y: 100.0 }),
+                Entity::make_zombie(Vec2 { x: 350.0, y: 150.0 }),
+                Entity::make_zombie(Vec2 { x: 500.0, y: 300.0 }),
+            ],
+            field: field,
+        };
+        return engine;
     }
 
     fn get_next_zombie_speed_vec(zombie: &Entity, gladiator: &Entity) -> Vec2 {
@@ -247,15 +260,7 @@ async fn main() {
         width: screen_width(),
         height: screen_height(),
     };
-    let mut engine = Engine {
-        gladiator: Entity::GLADIATOR,
-        zombies: vec![
-            Entity::make_zombie(Vec2 { x: 200.0, y: 100.0 }),
-            Entity::make_zombie(Vec2 { x: 350.0, y: 150.0 }),
-            Entity::make_zombie(Vec2 { x: 500.0, y: 300.0 }),
-        ],
-        field: field,
-    };
+    let mut engine = Engine::new(field.clone());
 
     loop {
         if is_key_down(KeyCode::W) {
@@ -278,6 +283,9 @@ async fn main() {
         }
         if is_key_down(KeyCode::Space) {
             engine.attack()
+        }
+        if is_key_down(KeyCode::R) {
+            engine = Engine::new(field.clone());
         }
         if is_key_down(KeyCode::Q) {
             return;
