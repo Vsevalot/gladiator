@@ -61,6 +61,7 @@ struct Entity {
     hp: f32,
     direction_angle: f32,
     weapon: Weapon,
+    mass: f32,
 }
 
 impl Entity {
@@ -72,6 +73,7 @@ impl Entity {
         hp: 100.0,
         direction_angle: 0.0,
         weapon: Weapon::SPEAR,
+        mass: 100.0,
     };
     pub const ZOMBIE: Self = Self {
         position: Vec2 { x: 300.0, y: 100.0 },
@@ -81,6 +83,7 @@ impl Entity {
         hp: 30.0,
         direction_angle: 0.0,
         weapon: Weapon::BITE,
+        mass: 50.0,
     };
     pub fn tick(&mut self) {
         self.weapon.tick();
@@ -118,6 +121,14 @@ struct Engine {
     gladiator: Entity,
     zombies: Vec<Entity>,
     field: Field,
+}
+
+fn get_new_speeds(entity1: &Entity, entity2: &Entity) -> (Vec2, Vec2) {
+    let v1 = (2.0 * entity2.mass * entity2.speed + (entity1.mass - entity2.mass) * entity1.speed)
+        / (entity1.mass + entity2.mass);
+    let v2 = (2.0 * entity1.mass * entity1.speed + (entity2.mass - entity1.mass) * entity2.speed)
+        / (entity1.mass + entity2.mass);
+    return (v1, v2);
 }
 
 impl Engine {
@@ -187,18 +198,18 @@ impl Engine {
         for (i, zombie) in &mut self.zombies.iter_mut().enumerate() {
             let old_pos = zombie.position;
             zombie.speed = Engine::get_next_zombie_speed_vec(zombie, &self.gladiator);
-            zombie.position += zombie.speed;
-            zombie.direction_angle = Engine::get_next_zombie_direction_angle(zombie);
-            zombie.position = Engine::get_position_within_field(zombie, &self.field);
-
-            if zombies_copy
-                .iter()
-                .enumerate()
-                .any(|(k, z)| (k != i) && zombie.intersects_with(&z))
-                || self.gladiator.intersects_with(zombie)
-            {
-                zombie.position = old_pos;
-            }
+            // zombie.position += zombie.speed;
+            // zombie.direction_angle = Engine::get_next_zombie_direction_angle(zombie);
+            // zombie.position = Engine::get_position_within_field(zombie, &self.field);
+            //
+            // if zombies_copy
+            //     .iter()
+            //     .enumerate()
+            //     .any(|(k, z)| (k != i) && zombie.intersects_with(&z))
+            //     || self.gladiator.intersects_with(zombie)
+            // {
+            //     zombie.position = old_pos;
+            // }
         }
     }
 
@@ -211,6 +222,34 @@ impl Engine {
             .collect();
     }
 
+    fn move_entitites(&mut self) {
+        // self.move_gladiator();
+        self.move_zombies();
+        let mut entities = std::iter::once(&mut self.gladiator)
+            .chain(self.zombies.iter_mut())
+            .collect::<Vec<&mut Entity>>();
+
+        for i in 0..entities.len() {
+            let mut collided = Vec::new();
+            for k in 0..entities.len() {
+                if entities[i].intersects_with(entities[k]) {
+                    collided.push(k);
+                }
+            }
+            if collided.len() > 0 {
+                for k in 0..collided.len() {
+                    let (new_speed1, new_speed2) = get_new_speeds(entities[i], entities[k]);
+                    entities[i].speed = new_speed1;
+                    entities[k].speed = new_speed2;
+                }
+            }
+
+            let speed = entities[i].speed;
+            entities[i].position += speed;
+            entities[i].speed = Vec2::ZERO;
+        }
+    }
+
     pub fn tick(&mut self) {
         if self.gladiator.weapon.is_damaging() {
             let damage_point = self.gladiator.get_attack_vec2();
@@ -221,8 +260,7 @@ impl Engine {
             }
         }
         self.remove_dead_zombies();
-        self.move_gladiator();
-        self.move_zombies();
+        self.move_entitites();
         self.gladiator.tick()
     }
 }
