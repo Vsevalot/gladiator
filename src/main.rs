@@ -1,6 +1,7 @@
 use macroquad::prelude::*;
 
 const RADIUS: f32 = 30.0;
+const ATTACK_RANGE: f32 = 45.0;
 
 #[derive(Debug, Clone, Copy)]
 struct Entity {
@@ -8,6 +9,8 @@ struct Entity {
     speed: Vec2,
     radius: f32,
     color: Color,
+    hp: f32,
+    direction_angle: f32,
 }
 
 impl Entity {
@@ -16,12 +19,16 @@ impl Entity {
         speed: Vec2::ZERO,
         radius: RADIUS,
         color: RED,
+        hp: 100.0,
+        direction_angle: 0.0,
     };
     pub const ZOMBIE: Self = Self {
         position: Vec2 { x: 300.0, y: 100.0 },
         speed: Vec2 { x: -1.0, y: 0.0 },
         radius: RADIUS,
         color: GREEN,
+        hp: 30.0,
+        direction_angle: 0.0,
     };
     pub fn make_zombie(pos: Vec2) -> Self {
         let mut z = Self::ZOMBIE;
@@ -32,6 +39,12 @@ impl Entity {
     pub fn intersects_with(&self, other: &Entity) -> bool {
         let out = self.position.distance(other.position) < self.radius + other.radius;
         return out;
+    }
+    pub fn get_attack_vec2(&self) -> Vec2 {
+        return Vec2{
+            x: self.direction_angle.cos() * ATTACK_RANGE,
+            y: self.direction_angle.sin() * ATTACK_RANGE,
+        } + self.position;
     }
 }
 
@@ -72,6 +85,11 @@ impl Engine {
         let new_speed = gladiator.position - zombie.position;
         return 0.2*new_speed.normalize();
     }
+
+    fn get_next_zombie_direction_angle(zombie: &Entity) -> f32 {
+        return zombie.speed.y.atan2(zombie.speed.x);
+    }
+
     pub fn move_gladiator(&mut self) {
         let old_pos = self.gladiator.position;
         self.gladiator.position += self.gladiator.speed;
@@ -92,7 +110,9 @@ impl Engine {
 
         for (i, zombie) in &mut self.zombies.iter_mut().enumerate() {
             let old_pos = zombie.position;
-            zombie.position += Engine::get_next_zombie_speed_vec(zombie, &self.gladiator);
+            zombie.speed = Engine::get_next_zombie_speed_vec(zombie, &self.gladiator);
+            zombie.position += zombie.speed;
+            zombie.direction_angle = Engine::get_next_zombie_direction_angle(zombie);
             zombie.position = Engine::get_position_within_field(zombie, &self.field);
 
             if zombies_copy
@@ -110,6 +130,26 @@ impl Engine {
         self.move_gladiator();
         self.move_zombies();
     }
+}
+
+fn draw_entity(entity: &Entity, field: &Field){
+    draw_circle(
+        entity.position.x,
+        field.height-entity.position.y,
+        entity.radius,
+        entity.color,
+    );
+
+    let e_attack_vec = entity.get_attack_vec2();
+
+    draw_line(
+        entity.position.x,
+        field.height-entity.position.y,
+        e_attack_vec.x,
+        field.height-e_attack_vec.y,
+        4.0,
+        ORANGE,
+    );
 }
 
 #[macroquad::main("Gladiator")]
@@ -141,6 +181,12 @@ async fn main() {
         if is_key_down(KeyCode::D) {
             engine.gladiator.speed.x += 1.0;
         }
+        if is_key_down(KeyCode::Left) {
+            engine.gladiator.direction_angle -= (0.1)/3.14;
+        }
+        if is_key_down(KeyCode::Right) {
+            engine.gladiator.direction_angle += (0.1)/3.14;
+        }
         if is_key_down(KeyCode::Q) {
             return;
         }
@@ -148,20 +194,10 @@ async fn main() {
         engine.tick();
 
         clear_background(WHITE);
-        draw_circle(
-            engine.gladiator.position.x,
-            engine.field.height-engine.gladiator.position.y,
-            engine.gladiator.radius,
-            engine.gladiator.color,
-        );
+        draw_entity(&engine.gladiator, &engine.field);
 
         for zombie in &engine.zombies {
-            draw_circle(
-                zombie.position.x,
-                engine.field.height-zombie.position.y,
-                zombie.radius,
-                zombie.color,
-            );
+            draw_entity(zombie, &engine.field);
         }
         next_frame().await
     }

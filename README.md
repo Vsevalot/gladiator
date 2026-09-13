@@ -3,6 +3,7 @@ TODO:
 
 simulation:
 - collisions (impulses?)
++ directions
 - attacks, hp, stamina
 - sector tracing -> for model input
 - score
