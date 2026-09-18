@@ -131,6 +131,14 @@ fn get_new_speeds(entity1: &Entity, entity2: &Entity) -> (Vec2, Vec2) {
     return (v1, -v2);
 }
 
+fn get_pushed_out_speeds(entity1: &Entity, entity2: &Entity) -> (Vec2, Vec2) {
+    let center_to_center_vector = 5.0 * (entity1.position - entity2.position).normalize();
+    return (
+        entity2.mass / (entity1.mass + entity2.mass) * center_to_center_vector,
+        -entity1.mass / (entity1.mass + entity2.mass) * center_to_center_vector,
+    );
+}
+
 impl Engine {
     fn get_position_within_field(entity: &Entity, field: &Field) -> Vec2 {
         let mut new_pos = entity.position;
@@ -202,16 +210,19 @@ impl Engine {
         for i in 0..entities.len() {
             let mut collided_indexes = Vec::new();
             for k in 0..entities.len() {
-                if i == k {continue;}
+                if i == k {
+                    continue;
+                }
                 if entities[i].intersects_with(entities[k]) {
                     collided_indexes.push(k);
                 }
             }
             println!("Collided: {:?}", collided_indexes);
             for k in collided_indexes {
-                let (new_speed1, new_speed2) = get_new_speeds(entities[i], entities[k]);
-                entities[i].speed = new_speed1;
-                entities[k].speed = new_speed2;
+                // let (new_speed1, new_speed2) = get_new_speeds(entities[i], entities[k]);
+                let (new_speed1, new_speed2) = get_pushed_out_speeds(entities[i], entities[k]);
+                entities[i].speed += new_speed1;
+                entities[k].speed += new_speed2;
             }
 
             let speed = entities[i].speed;
