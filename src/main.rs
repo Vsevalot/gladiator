@@ -123,14 +123,6 @@ struct Engine {
     field: Field,
 }
 
-fn get_new_speeds(entity1: &Entity, entity2: &Entity) -> (Vec2, Vec2) {
-    let v1 = (2.0 * entity2.mass * entity2.speed + (entity1.mass - entity2.mass) * entity1.speed)
-        / (entity1.mass + entity2.mass);
-    let v2 = (2.0 * entity1.mass * entity1.speed + (entity2.mass - entity1.mass) * entity2.speed)
-        / (entity1.mass + entity2.mass);
-    return (v1, -v2);
-}
-
 fn get_pushed_out_speeds(entity1: &Entity, entity2: &Entity) -> (Vec2, Vec2) {
     let center_to_center_vector = entity1.position - entity2.position;
     let min_not_pushable_distance = entity1.radius + entity2.radius;
@@ -182,8 +174,7 @@ impl Engine {
 
     fn get_next_zombie_speed_vec(zombie: &Entity, gladiator: &Entity) -> Vec2 {
         let new_speed = gladiator.position - zombie.position;
-        return 0.3 * new_speed.normalize();
-        // return Vec2::ZERO;
+        return 0.5 * new_speed.normalize();
     }
 
     fn get_next_zombie_direction_angle(zombie: &Entity) -> f32 {
@@ -227,7 +218,6 @@ impl Engine {
             }
             println!("Collided: {:?}", collided_indexes);
             for k in collided_indexes {
-                // let (new_speed1, new_speed2) = get_new_speeds(entities[i], entities[k]);
                 let (new_speed1, new_speed2) = get_pushed_out_speeds(entities[i], entities[k]);
                 entities[i].speed += new_speed1;
                 entities[k].speed += new_speed2;
@@ -235,7 +225,7 @@ impl Engine {
 
             let speed = entities[i].speed;
             entities[i].position += speed;
-            entities[i].speed = entities[i].speed * 0.3;
+            entities[i].speed *= 0.3; // slowing down?...
             entities[i].position = Engine::get_position_within_field(entities[i], &self.field);
         }
     }

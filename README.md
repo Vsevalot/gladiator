@@ -2,11 +2,12 @@
 TODO:
 
 simulation:
-- collisions (impulses?)
++ collisions (impulses?)
 + directions
 + attacks, hp
 - stamina
 - spear animation
+- textures
 - make tick process all
 - sector tracing -> for model input
 - score
