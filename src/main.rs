@@ -138,7 +138,8 @@ fn get_pushed_out_speeds(entity1: &Entity, entity2: &Entity) -> (Vec2, Vec2) {
         return (Vec2::ZERO, Vec2::ZERO);
     }
 
-    let push_coef = 0.02 * min_not_pushable_distance / center_to_center_vector.length();
+    let mut push_coef = min_not_pushable_distance / center_to_center_vector.length();
+    push_coef = 0.01 * push_coef * push_coef * push_coef;
 
     return (
         entity2.mass * push_coef / (entity1.mass + entity2.mass) * center_to_center_vector,
