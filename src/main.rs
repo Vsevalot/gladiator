@@ -128,7 +128,7 @@ fn get_new_speeds(entity1: &Entity, entity2: &Entity) -> (Vec2, Vec2) {
         / (entity1.mass + entity2.mass);
     let v2 = (2.0 * entity1.mass * entity1.speed + (entity2.mass - entity1.mass) * entity2.speed)
         / (entity1.mass + entity2.mass);
-    return (v1, v2);
+    return (v1, -v2);
 }
 
 impl Engine {
@@ -167,6 +167,7 @@ impl Engine {
     fn get_next_zombie_speed_vec(zombie: &Entity, gladiator: &Entity) -> Vec2 {
         let new_speed = gladiator.position - zombie.position;
         return 0.3 * new_speed.normalize();
+        // return Vec2::ZERO;
     }
 
     fn get_next_zombie_direction_angle(zombie: &Entity) -> f32 {
@@ -194,22 +195,20 @@ impl Engine {
     }
 
     fn move_entitites(&mut self) {
-        self.set_zombie_speed();
-
         let mut entities = std::iter::once(&mut self.gladiator)
             .chain(self.zombies.iter_mut())
             .collect::<Vec<&mut Entity>>();
 
         for i in 0..entities.len() {
-            let mut collided = Vec::new();
+            let mut collided_indexes = Vec::new();
             for k in 0..entities.len() {
                 if i == k {continue;}
                 if entities[i].intersects_with(entities[k]) {
-                    collided.push(k);
+                    collided_indexes.push(k);
                 }
             }
-            println!("Collided: {:?}", collided);
-            for k in collided {
+            println!("Collided: {:?}", collided_indexes);
+            for k in collided_indexes {
                 let (new_speed1, new_speed2) = get_new_speeds(entities[i], entities[k]);
                 entities[i].speed = new_speed1;
                 entities[k].speed = new_speed2;
@@ -232,6 +231,7 @@ impl Engine {
             }
         }
         self.remove_dead_zombies();
+        self.set_zombie_speed();
         self.move_entitites();
         self.gladiator.tick()
     }
