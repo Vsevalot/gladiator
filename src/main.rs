@@ -1,7 +1,6 @@
 use macroquad::prelude::*;
 
 const RADIUS: f32 = 30.0;
-const ATTACK_RANGE: f32 = 45.0;
 
 #[derive(Debug, Clone, Copy)]
 struct Weapon {
@@ -11,6 +10,7 @@ struct Weapon {
     damage_tick_end: u32,
     damage: f32,
     stamina_cost: f32,
+    range: f32,
 }
 
 impl Weapon {
@@ -21,14 +21,16 @@ impl Weapon {
         damage_tick_end: 20,
         damage: 10.0,
         stamina_cost: 10.0,
+        range: 45.0,
     };
     pub const BITE: Self = Self {
         cooldown_ticks: 100,
         current_tick: 0,
         damage_tick_start: 20,
         damage_tick_end: 60,
-        damage: 10.0,
+        damage: 1.0,
         stamina_cost: 10.0,
+        range: 45.0,
     };
     pub fn can_attack(&self) -> bool {
         return self.current_tick == 0;
@@ -45,6 +47,7 @@ impl Weapon {
             self.current_tick = 1;
         }
     }
+
     pub fn tick(&mut self) {
         if self.is_attacking() {
             self.current_tick += 1;
@@ -61,6 +64,7 @@ struct Entity {
     speed: Vec2,
     radius: f32,
     color: Color,
+    max_hp: f32,
     hp: f32,
     direction_angle: f32,
     weapon: Weapon,
@@ -76,6 +80,7 @@ impl Entity {
         speed: Vec2::ZERO,
         radius: RADIUS,
         color: RED,
+        max_hp: 100.0,
         hp: 100.0,
         direction_angle: 0.0,
         weapon: Weapon::SPEAR,
@@ -89,6 +94,7 @@ impl Entity {
         speed: Vec2::ZERO,
         radius: RADIUS,
         color: GREEN,
+        max_hp: 30.0,
         hp: 30.0,
         direction_angle: 0.0,
         weapon: Weapon::BITE,
@@ -116,15 +122,25 @@ impl Entity {
             self.weapon.attack();
         }
     }
+    pub fn is_attacking(&self) -> bool {
+        return self.weapon.is_attacking();
+    }
+
+    pub fn weapon_intersects_with(&self, entity: &Entity) -> bool {
+        if (self.get_attack_vec() - entity.position).length() < entity.radius {
+            return true;
+        }
+        return false;
+    }
 
     pub fn intersects_with(&self, other: &Entity) -> bool {
         let out = self.position.distance(other.position) < self.radius + other.radius;
         return out;
     }
-    pub fn get_attack_vec2(&self) -> Vec2 {
+    pub fn get_attack_vec(&self) -> Vec2 {
         return Vec2 {
-            x: self.direction_angle.cos() * ATTACK_RANGE,
-            y: self.direction_angle.sin() * ATTACK_RANGE,
+            x: self.direction_angle.cos() * self.weapon.range,
+            y: self.direction_angle.sin() * self.weapon.range,
         } + self.position;
     }
 }
@@ -140,6 +156,7 @@ struct Engine {
     gladiator: Entity,
     zombies: Vec<Entity>,
     field: Field,
+    game_ended: bool,
 }
 
 fn get_pushed_out_speeds(entity1: &Entity, entity2: &Entity) -> (Vec2, Vec2) {
@@ -187,6 +204,7 @@ impl Engine {
                 Entity::make_zombie(Vec2 { x: 500.0, y: 300.0 }),
             ],
             field: field,
+            game_ended: false,
         };
         return engine;
     }
@@ -200,8 +218,15 @@ impl Engine {
         return zombie.speed.y.atan2(zombie.speed.x);
     }
 
-    pub fn attack(&mut self) {
+    pub fn attack_by_gladiator(&mut self) {
         self.gladiator.attack();
+    }
+    pub fn attack_by_zombies(&mut self) {
+        for zombie in self.zombies.iter_mut() {
+            if zombie.weapon_intersects_with(&self.gladiator) {
+                zombie.attack();
+            }
+        }
     }
 
     pub fn set_zombie_speed(&mut self) {
@@ -235,7 +260,6 @@ impl Engine {
                     collided_indexes.push(k);
                 }
             }
-            println!("Collided: {:?}", collided_indexes);
             for k in collided_indexes {
                 let (new_speed1, new_speed2) = get_pushed_out_speeds(entities[i], entities[k]);
                 entities[i].speed += new_speed1;
@@ -249,23 +273,76 @@ impl Engine {
         }
     }
 
-    pub fn tick(&mut self) {
-        if self.gladiator.weapon.is_damaging() {
-            let damage_point = self.gladiator.get_attack_vec2();
-            for zombie in self.zombies.iter_mut() {
-                if zombie.position.distance(damage_point) < zombie.radius {
-                    zombie.hp -= self.gladiator.weapon.damage;
+    fn process_attacks(&mut self) {
+        self.attack_by_zombies();
+
+        let mut entities = std::iter::once(&mut self.gladiator)
+            .chain(self.zombies.iter_mut())
+            .collect::<Vec<&mut Entity>>();
+
+        for i in 0..entities.len() {
+            if !entities[i].is_attacking() {
+                continue;
+            }
+
+            let mut collided_indexes = Vec::new();
+            for k in 0..entities.len() {
+                if i == k {
+                    continue;
+                }
+                if entities[i].weapon_intersects_with(entities[k]) {
+                    collided_indexes.push(k);
                 }
             }
+
+            for k in 0..collided_indexes.len() {
+                entities[k].hp -= entities[i].weapon.damage;
+            }
+        }
+    }
+
+    fn end_game(&mut self) {
+        self.game_ended = true;
+    }
+
+    pub fn tick(&mut self) {
+        if self.game_ended {
+            return;
         }
         self.remove_dead_zombies();
         self.set_zombie_speed();
         self.move_entitites();
-        self.gladiator.tick()
+        self.process_attacks();
+
+        let entities = std::iter::once(&mut self.gladiator)
+            .chain(self.zombies.iter_mut())
+            .collect::<Vec<&mut Entity>>();
+        for entity in entities {
+            entity.tick();
+        }
+
+        if self.gladiator.hp < 0.0 {
+            self.end_game()
+        }
     }
 }
 
 fn draw_entity(entity: &Entity, field: &Field) {
+    draw_rectangle(
+        entity.position.x - entity.radius,
+        field.height - entity.position.y - entity.radius - 10.0,
+        50.0,
+        10.0,
+        RED,
+    );
+    draw_rectangle(
+        entity.position.x - entity.radius,
+        field.height - entity.position.y - entity.radius - 10.0,
+        50.0 * (entity.hp / entity.max_hp),
+        10.0,
+        GREEN,
+    );
+
     draw_circle(
         entity.position.x,
         field.height - entity.position.y,
@@ -273,7 +350,7 @@ fn draw_entity(entity: &Entity, field: &Field) {
         entity.color,
     );
 
-    let e_attack_vec = entity.get_attack_vec2();
+    let e_attack_vec = entity.get_attack_vec();
 
     let mut weapon_color = YELLOW;
     if entity.weapon.is_attacking() {
@@ -337,7 +414,7 @@ async fn main() {
             engine.gladiator.direction_angle += (0.1) / std::f32::consts::PI;
         }
         if is_key_down(KeyCode::Space) {
-            engine.attack()
+            engine.attack_by_gladiator()
         }
         if is_key_down(KeyCode::R) {
             engine = Engine::new(field.clone());
