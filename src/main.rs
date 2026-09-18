@@ -132,10 +132,17 @@ fn get_new_speeds(entity1: &Entity, entity2: &Entity) -> (Vec2, Vec2) {
 }
 
 fn get_pushed_out_speeds(entity1: &Entity, entity2: &Entity) -> (Vec2, Vec2) {
-    let center_to_center_vector = 5.0 * (entity1.position - entity2.position).normalize();
+    let center_to_center_vector = entity1.position - entity2.position;
+    let min_not_pushable_distance = entity1.radius + entity2.radius;
+    if center_to_center_vector.length() >= min_not_pushable_distance {
+        return (Vec2::ZERO, Vec2::ZERO);
+    }
+
+    let push_coef = 0.02 * min_not_pushable_distance / center_to_center_vector.length();
+
     return (
-        entity2.mass / (entity1.mass + entity2.mass) * center_to_center_vector,
-        -entity1.mass / (entity1.mass + entity2.mass) * center_to_center_vector,
+        entity2.mass * push_coef / (entity1.mass + entity2.mass) * center_to_center_vector,
+        -entity1.mass * push_coef / (entity1.mass + entity2.mass) * center_to_center_vector,
     );
 }
 
@@ -227,7 +234,7 @@ impl Engine {
 
             let speed = entities[i].speed;
             entities[i].position += speed;
-            entities[i].speed = Vec2::ZERO;
+            entities[i].speed = entities[i].speed * 0.3;
             entities[i].position = Engine::get_position_within_field(entities[i], &self.field);
         }
     }
