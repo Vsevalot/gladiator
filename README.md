@@ -11,6 +11,7 @@ simulation:
 - make tick process all
 - sector tracing -> for model input
 - score
+- interface (stamina, HP, cd)
 
 
 training framework:

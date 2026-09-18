@@ -10,15 +10,17 @@ struct Weapon {
     damage_tick_start: u32,
     damage_tick_end: u32,
     damage: f32,
+    stamina_cost: f32,
 }
 
 impl Weapon {
     pub const SPEAR: Self = Self {
-        cooldown_ticks: 500,
+        cooldown_ticks: 50,
         current_tick: 0,
-        damage_tick_start: 100,
-        damage_tick_end: 200,
+        damage_tick_start: 10,
+        damage_tick_end: 20,
         damage: 10.0,
+        stamina_cost: 10.0,
     };
     pub const BITE: Self = Self {
         cooldown_ticks: 100,
@@ -26,6 +28,7 @@ impl Weapon {
         damage_tick_start: 20,
         damage_tick_end: 60,
         damage: 10.0,
+        stamina_cost: 10.0,
     };
     pub fn can_attack(&self) -> bool {
         return self.current_tick == 0;
@@ -62,6 +65,9 @@ struct Entity {
     direction_angle: f32,
     weapon: Weapon,
     mass: f32,
+    max_stamina: f32,
+    stamina: f32,
+    stamina_recovery_per_tick: f32,
 }
 
 impl Entity {
@@ -74,6 +80,9 @@ impl Entity {
         direction_angle: 0.0,
         weapon: Weapon::SPEAR,
         mass: 100.0,
+        max_stamina: 100.0,
+        stamina: 100.0,
+        stamina_recovery_per_tick: 1.0,
     };
     pub const ZOMBIE: Self = Self {
         position: Vec2 { x: 300.0, y: 100.0 },
@@ -84,9 +93,16 @@ impl Entity {
         direction_angle: 0.0,
         weapon: Weapon::BITE,
         mass: 10.0,
+        max_stamina: 100.0,
+        stamina: 100.0,
+        stamina_recovery_per_tick: 1.0,
     };
     pub fn tick(&mut self) {
         self.weapon.tick();
+        self.stamina += self.stamina_recovery_per_tick;
+        if self.stamina >= self.max_stamina {
+            self.stamina = self.max_stamina;
+        }
     }
     pub fn make_zombie(pos: Vec2) -> Self {
         let mut z = Self::ZOMBIE;
@@ -95,7 +111,10 @@ impl Entity {
     }
 
     pub fn attack(&mut self) {
-        self.weapon.attack();
+        if self.stamina >= self.weapon.stamina_cost {
+            self.stamina -= self.weapon.stamina_cost;
+            self.weapon.attack();
+        }
     }
 
     pub fn intersects_with(&self, other: &Entity) -> bool {
@@ -273,6 +292,23 @@ fn draw_entity(entity: &Entity, field: &Field) {
     );
 }
 
+fn draw_interface(hp: f32, stamina: f32) {
+    draw_rectangle(10.0, 10.0, 300.0, 100.0, GRAY);
+    draw_text(format!("HP: {}", hp), 20.0, 30.0, 20.0, BLACK);
+    draw_text(format!("Stamina: {}", stamina), 20.0, 60.0, 20.0, BLACK);
+}
+
+fn draw_all(engine: &Engine) {
+    clear_background(WHITE);
+    draw_entity(&engine.gladiator, &engine.field);
+
+    for zombie in &engine.zombies {
+        draw_entity(zombie, &engine.field);
+    }
+
+    draw_interface(engine.gladiator.hp, engine.gladiator.stamina);
+}
+
 #[macroquad::main("Gladiator")]
 async fn main() {
     let field = Field {
@@ -310,14 +346,9 @@ async fn main() {
             return;
         }
 
+        draw_all(&engine);
         engine.tick();
 
-        clear_background(WHITE);
-        draw_entity(&engine.gladiator, &engine.field);
-
-        for zombie in &engine.zombies {
-            draw_entity(zombie, &engine.field);
-        }
         next_frame().await
     }
 }
