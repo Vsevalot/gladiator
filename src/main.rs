@@ -3,6 +3,7 @@ use macroquad::prelude::*;
 type ID = u32;
 
 const RADIUS: f32 = 40.0;
+const MAX_ROTATION_SPEED: f32 = 1000.01;
 
 #[derive(Debug, Clone)]
 struct TexturePack {
@@ -175,9 +176,9 @@ impl Entity {
     }
     pub fn get_direction_vec(&self) -> Vec2 {
         return Vec2 {
-            x: self.direction_angle.cos() * self.weapon.range,
-            y: self.direction_angle.sin() * self.weapon.range,
-        } + self.position;
+            x: self.direction_angle.cos(),
+            y: self.direction_angle.sin(),
+        };
     }
 
     pub fn get_attack_vec(&self) -> Vec2 {
@@ -255,15 +256,6 @@ impl Engine {
         return engine;
     }
 
-    fn get_next_zombie_speed_vec(zombie: &Entity, gladiator: &Entity) -> Vec2 {
-        let new_speed = gladiator.position - zombie.position;
-        return 0.5 * new_speed.normalize();
-    }
-
-    fn get_next_zombie_direction_angle(zombie: &Entity) -> f32 {
-        return zombie.speed.y.atan2(zombie.speed.x);
-    }
-
     pub fn attack_by_gladiator(&mut self) {
         self.gladiator.attack();
     }
@@ -277,8 +269,20 @@ impl Engine {
 
     pub fn set_zombie_speed(&mut self) {
         for zombie in &mut self.zombies.iter_mut() {
-            zombie.speed = Engine::get_next_zombie_speed_vec(zombie, &self.gladiator);
-            zombie.direction_angle = Engine::get_next_zombie_direction_angle(zombie);
+            let mut angle_to_target = (self.gladiator.position - zombie.position)
+                .angle_between(zombie.get_direction_vec());
+            if angle_to_target.abs() >= MAX_ROTATION_SPEED {
+                if angle_to_target > 0.0 {
+                    angle_to_target = MAX_ROTATION_SPEED;
+                } else {
+                    angle_to_target = -MAX_ROTATION_SPEED;
+                }
+            }
+            zombie.speed = Vec2 {
+                x: angle_to_target.cos() * 0.1,
+                y: angle_to_target.sin() * 0.1,
+            };
+            zombie.direction_angle = angle_to_target;
         }
     }
 
@@ -420,7 +424,7 @@ fn draw_entity(entity: &Entity, field: &Field) {
         Color::new(0.0, 0.0, 0.0, 0.3),
     );
 
-    let e_direction = entity.get_direction_vec();
+    let e_direction = entity.radius * entity.get_direction_vec() + entity.position;
 
     draw_line(
         entity.position.x,
