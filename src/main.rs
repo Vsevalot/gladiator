@@ -1,8 +1,16 @@
 use macroquad::prelude::*;
 
-const RADIUS: f32 = 30.0;
+type ID = u32;
 
-#[derive(Debug, Clone, Copy)]
+const RADIUS: f32 = 40.0;
+
+#[derive(Debug, Clone)]
+struct TexturePack {
+    gladiator: Texture2D,
+    zombie: Texture2D,
+}
+
+#[derive(Debug, Clone)]
 struct Weapon {
     cooldown_ticks: u32,
     current_tick: u32,
@@ -11,6 +19,7 @@ struct Weapon {
     damage: f32,
     stamina_cost: f32,
     range: f32,
+    damaged_this_cycle: Vec<ID>,
 }
 
 impl Weapon {
@@ -21,8 +30,10 @@ impl Weapon {
         damage_tick_end: 20,
         damage: 10.0,
         stamina_cost: 10.0,
-        range: 45.0,
+        range: 65.0,
+        damaged_this_cycle: vec![],
     };
+
     pub const BITE: Self = Self {
         cooldown_ticks: 100,
         current_tick: 0,
@@ -30,17 +41,29 @@ impl Weapon {
         damage_tick_end: 60,
         damage: 1.0,
         stamina_cost: 10.0,
-        range: 45.0,
+        range: 65.0,
+        damaged_this_cycle: vec![],
     };
+
     pub fn can_attack(&self) -> bool {
         return self.current_tick == 0;
     }
+
     pub fn is_attacking(&self) -> bool {
         return self.current_tick != 0;
     }
+
     pub fn is_damaging(&self) -> bool {
         return self.damage_tick_start <= self.current_tick
             && self.current_tick <= self.damage_tick_end;
+    }
+
+    pub fn register_hit(&mut self, entity_id: ID) {
+        self.damaged_this_cycle.push(entity_id);
+    }
+
+    pub fn is_already_hit_this_cycle(&self, entity_id: &ID) -> bool {
+        return self.damaged_this_cycle.contains(entity_id);
     }
     pub fn attack(&mut self) {
         if self.can_attack() {
@@ -53,56 +76,36 @@ impl Weapon {
             self.current_tick += 1;
             if self.current_tick >= self.cooldown_ticks {
                 self.current_tick = 0;
+                self.damaged_this_cycle.clear();
             }
         }
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct Entity {
+    id: ID,
+
     position: Vec2,
     speed: Vec2,
+    mass: f32,
     radius: f32,
+    direction_angle: f32,
+
     color: Color,
+    texture: Texture2D,
+
     max_hp: f32,
     hp: f32,
-    direction_angle: f32,
+
     weapon: Weapon,
-    mass: f32,
+
     max_stamina: f32,
     stamina: f32,
     stamina_recovery_per_tick: f32,
 }
 
 impl Entity {
-    pub const GLADIATOR: Self = Self {
-        position: Vec2::ZERO,
-        speed: Vec2::ZERO,
-        radius: RADIUS,
-        color: RED,
-        max_hp: 100.0,
-        hp: 100.0,
-        direction_angle: 0.0,
-        weapon: Weapon::SPEAR,
-        mass: 100.0,
-        max_stamina: 100.0,
-        stamina: 100.0,
-        stamina_recovery_per_tick: 1.0,
-    };
-    pub const ZOMBIE: Self = Self {
-        position: Vec2 { x: 300.0, y: 100.0 },
-        speed: Vec2::ZERO,
-        radius: RADIUS,
-        color: GREEN,
-        max_hp: 30.0,
-        hp: 30.0,
-        direction_angle: 0.0,
-        weapon: Weapon::BITE,
-        mass: 10.0,
-        max_stamina: 100.0,
-        stamina: 100.0,
-        stamina_recovery_per_tick: 1.0,
-    };
     pub fn tick(&mut self) {
         self.weapon.tick();
         self.stamina += self.stamina_recovery_per_tick;
@@ -110,10 +113,43 @@ impl Entity {
             self.stamina = self.max_stamina;
         }
     }
-    pub fn make_zombie(pos: Vec2) -> Self {
-        let mut z = Self::ZOMBIE;
-        z.position = pos;
-        return z;
+
+    pub fn make_gladiator(position: Vec2, texture: Texture2D) -> Self {
+        return Self {
+            id: 1,
+            position: position,
+            speed: Vec2::ZERO,
+            radius: RADIUS,
+            color: RED,
+            max_hp: 100.0,
+            hp: 100.0,
+            direction_angle: 0.0,
+            weapon: Weapon::SPEAR,
+            mass: 100.0,
+            max_stamina: 100.0,
+            stamina: 100.0,
+            stamina_recovery_per_tick: 1.0,
+            texture: texture,
+        };
+    }
+
+    pub fn make_zombie(id: ID, pos: Vec2, texture: Texture2D) -> Self {
+        return Self {
+            id: id,
+            position: pos,
+            speed: Vec2::ZERO,
+            radius: RADIUS,
+            color: GREEN,
+            max_hp: 30.0,
+            hp: 30.0,
+            direction_angle: 0.0,
+            weapon: Weapon::BITE,
+            mass: 10.0,
+            max_stamina: 100.0,
+            stamina: 100.0,
+            stamina_recovery_per_tick: 1.0,
+            texture: texture,
+        };
     }
 
     pub fn attack(&mut self) {
@@ -195,13 +231,13 @@ impl Engine {
         return new_pos;
     }
 
-    fn new(field: Field) -> Self {
+    fn new(texture_pack: TexturePack, field: Field) -> Self {
         let engine = Engine {
-            gladiator: Entity::GLADIATOR,
+            gladiator: Entity::make_gladiator(Vec2::ZERO, texture_pack.gladiator.clone()),
             zombies: vec![
-                Entity::make_zombie(Vec2 { x: 200.0, y: 100.0 }),
-                Entity::make_zombie(Vec2 { x: 350.0, y: 150.0 }),
-                Entity::make_zombie(Vec2 { x: 500.0, y: 300.0 }),
+                Entity::make_zombie(2, Vec2 { x: 200.0, y: 100.0 }, texture_pack.zombie.clone()),
+                Entity::make_zombie(3, Vec2 { x: 350.0, y: 150.0 }, texture_pack.zombie.clone()),
+                Entity::make_zombie(4, Vec2 { x: 500.0, y: 300.0 }, texture_pack.zombie.clone()),
             ],
             field: field,
             game_ended: false,
@@ -221,7 +257,7 @@ impl Engine {
     pub fn attack_by_gladiator(&mut self) {
         self.gladiator.attack();
     }
-    pub fn attack_by_zombies(&mut self) {
+    pub fn trigger_attack_by_zombies(&mut self) {
         for zombie in self.zombies.iter_mut() {
             if zombie.weapon_intersects_with(&self.gladiator) {
                 zombie.attack();
@@ -273,9 +309,7 @@ impl Engine {
         }
     }
 
-    fn process_attacks(&mut self) {
-        self.attack_by_zombies();
-
+    fn apply_damage(&mut self) {
         let mut entities = std::iter::once(&mut self.gladiator)
             .chain(self.zombies.iter_mut())
             .collect::<Vec<&mut Entity>>();
@@ -285,18 +319,21 @@ impl Engine {
                 continue;
             }
 
-            let mut collided_indexes = Vec::new();
             for k in 0..entities.len() {
                 if i == k {
                     continue;
                 }
-                if entities[i].weapon_intersects_with(entities[k]) {
-                    collided_indexes.push(k);
-                }
-            }
 
-            for k in 0..collided_indexes.len() {
-                entities[k].hp -= entities[i].weapon.damage;
+                let hit_id = entities[k].id;
+
+                if entities[i].weapon.is_already_hit_this_cycle(&hit_id) {
+                    continue;
+                }
+
+                if entities[i].weapon_intersects_with(entities[k]) {
+                    entities[k].hp -= entities[i].weapon.damage;
+                    entities[i].weapon.register_hit(hit_id);
+                }
             }
         }
     }
@@ -312,11 +349,13 @@ impl Engine {
         self.remove_dead_zombies();
         self.set_zombie_speed();
         self.move_entitites();
-        self.process_attacks();
+        self.trigger_attack_by_zombies();
+        self.apply_damage();
 
         let entities = std::iter::once(&mut self.gladiator)
             .chain(self.zombies.iter_mut())
             .collect::<Vec<&mut Entity>>();
+
         for entity in entities {
             entity.tick();
         }
@@ -328,26 +367,40 @@ impl Engine {
 }
 
 fn draw_entity(entity: &Entity, field: &Field) {
+    let outer_radius = entity.radius * 1.7;
     draw_rectangle(
-        entity.position.x - entity.radius,
-        field.height - entity.position.y - entity.radius - 10.0,
-        50.0,
+        entity.position.x - outer_radius * 0.5,
+        field.height - entity.position.y - outer_radius - 5.0,
+        outer_radius,
         10.0,
         RED,
     );
     draw_rectangle(
-        entity.position.x - entity.radius,
-        field.height - entity.position.y - entity.radius - 10.0,
-        50.0 * (entity.hp / entity.max_hp),
+        entity.position.x - outer_radius * 0.5,
+        field.height - entity.position.y - outer_radius - 5.0,
+        outer_radius * (entity.hp / entity.max_hp),
         10.0,
         GREEN,
     );
 
-    draw_circle(
-        entity.position.x,
-        field.height - entity.position.y,
-        entity.radius,
-        entity.color,
+    let sprite_hw = outer_radius * 2.0;
+
+    draw_texture_ex(
+        &entity.texture,
+        entity.position.x - outer_radius,
+        field.height - (entity.position.y + outer_radius),
+        WHITE,
+        DrawTextureParams {
+            dest_size: Some(Vec2 {
+                x: sprite_hw,
+                y: sprite_hw,
+            }),
+            rotation: -entity.direction_angle,
+            source: None,
+            flip_x: false,
+            flip_y: false,
+            pivot: None,
+        },
     );
 
     let e_attack_vec = entity.get_attack_vec();
@@ -386,13 +439,26 @@ fn draw_all(engine: &Engine) {
     draw_interface(engine.gladiator.hp, engine.gladiator.stamina);
 }
 
+async fn load_textures() -> TexturePack {
+    let gladiator_texture = load_texture("assets/textures/gladiator.png").await.unwrap();
+    let zombie_texture = load_texture("assets/textures/zombie.png").await.unwrap();
+
+    return TexturePack {
+        gladiator: gladiator_texture,
+        zombie: zombie_texture,
+    };
+}
+
 #[macroquad::main("Gladiator")]
 async fn main() {
     let field = Field {
         width: screen_width(),
         height: screen_height(),
     };
-    let mut engine = Engine::new(field.clone());
+
+    let texture_pack = load_textures().await;
+
+    let mut engine = Engine::new(texture_pack.clone(), field.clone());
 
     loop {
         if is_key_down(KeyCode::W) {
@@ -417,7 +483,7 @@ async fn main() {
             engine.attack_by_gladiator()
         }
         if is_key_down(KeyCode::R) {
-            engine = Engine::new(field.clone());
+            engine = Engine::new(texture_pack.clone(), field.clone());
         }
         if is_key_down(KeyCode::Q) {
             return;

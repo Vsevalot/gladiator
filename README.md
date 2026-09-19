@@ -7,14 +7,15 @@ simulation:
 + attacks, hp
 + stamina
 + zombie_attacks
++ textures
 - spear animation
-- textures
 - make tick process all
 - sector tracing -> for model input
 - score
 + interface (stamina, HP, cd)
 - use rust enums to present weapon state
 - make zombies attack from farrer distance than hit
+- zombie rotation speed
 
 
 training framework:
