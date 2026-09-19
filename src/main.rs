@@ -20,6 +20,7 @@ struct Weapon {
     stamina_cost: f32,
     range: f32,
     damaged_this_cycle: Vec<ID>,
+    offset: f32,
 }
 
 impl Weapon {
@@ -32,6 +33,7 @@ impl Weapon {
         stamina_cost: 10.0,
         range: 65.0,
         damaged_this_cycle: vec![],
+        offset: RADIUS * 0.6,
     };
 
     pub const BITE: Self = Self {
@@ -39,10 +41,11 @@ impl Weapon {
         current_tick: 0,
         damage_tick_start: 20,
         damage_tick_end: 60,
-        damage: 1.0,
+        damage: 8.0,
         stamina_cost: 10.0,
         range: 65.0,
         damaged_this_cycle: vec![],
+        offset: 0.0,
     };
 
     pub fn can_attack(&self) -> bool {
@@ -92,7 +95,6 @@ struct Entity {
     radius: f32,
     direction_angle: f32,
 
-    color: Color,
     texture: Texture2D,
 
     max_hp: f32,
@@ -120,7 +122,6 @@ impl Entity {
             position: position,
             speed: Vec2::ZERO,
             radius: RADIUS,
-            color: RED,
             max_hp: 100.0,
             hp: 100.0,
             direction_angle: 0.0,
@@ -139,7 +140,6 @@ impl Entity {
             position: pos,
             speed: Vec2::ZERO,
             radius: RADIUS,
-            color: GREEN,
             max_hp: 30.0,
             hp: 30.0,
             direction_angle: 0.0,
@@ -173,10 +173,20 @@ impl Entity {
         let out = self.position.distance(other.position) < self.radius + other.radius;
         return out;
     }
+    pub fn get_direction_vec(&self) -> Vec2 {
+        return Vec2 {
+            x: self.direction_angle.cos() * self.weapon.range,
+            y: self.direction_angle.sin() * self.weapon.range,
+        } + self.position;
+    }
+
     pub fn get_attack_vec(&self) -> Vec2 {
         return Vec2 {
             x: self.direction_angle.cos() * self.weapon.range,
             y: self.direction_angle.sin() * self.weapon.range,
+        } + Vec2 {
+            x: (self.direction_angle - std::f32::consts::PI / 2.0).cos() * self.weapon.offset,
+            y: (self.direction_angle - std::f32::consts::PI / 2.0).sin() * self.weapon.offset,
         } + self.position;
     }
 }
@@ -403,23 +413,33 @@ fn draw_entity(entity: &Entity, field: &Field) {
         },
     );
 
-    let e_attack_vec = entity.get_attack_vec();
+    draw_circle(
+        entity.position.x,
+        field.height - entity.position.y,
+        entity.radius,
+        Color::new(0.0, 0.0, 0.0, 0.3),
+    );
 
-    let mut weapon_color = YELLOW;
+    let e_direction = entity.get_direction_vec();
+
+    draw_line(
+        entity.position.x,
+        field.height - entity.position.y,
+        e_direction.x,
+        field.height - e_direction.y,
+        4.0,
+        BLACK,
+    );
+
+    let e_attack = entity.get_attack_vec();
+    let mut weapon_color = RED;
     if entity.weapon.is_attacking() {
         weapon_color = ORANGE;
     }
     if entity.weapon.is_damaging() {
         weapon_color = BLACK;
     }
-    draw_line(
-        entity.position.x,
-        field.height - entity.position.y,
-        e_attack_vec.x,
-        field.height - e_attack_vec.y,
-        4.0,
-        weapon_color,
-    );
+    draw_circle(e_attack.x, field.height - e_attack.y, 5.0, weapon_color)
 }
 
 fn draw_interface(hp: f32, stamina: f32) {
