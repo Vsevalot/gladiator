@@ -3,7 +3,8 @@ use macroquad::prelude::*;
 type ID = u32;
 
 const RADIUS: f32 = 40.0;
-const MAX_ROTATION_SPEED: f32 = 1000.01;
+const MAX_ROTATION_SPEED: f32 = 0.01;
+const MIN_ROTATION_SPEED: f32 = 0.001;
 
 #[derive(Debug, Clone)]
 struct TexturePack {
@@ -244,7 +245,10 @@ impl Engine {
 
     fn new(texture_pack: TexturePack, field: Field) -> Self {
         let engine = Engine {
-            gladiator: Entity::make_gladiator(Vec2::ZERO, texture_pack.gladiator.clone()),
+            gladiator: Entity::make_gladiator(
+                Vec2 { x: 50.0, y: 50.0 },
+                texture_pack.gladiator.clone(),
+            ),
             zombies: vec![
                 Entity::make_zombie(2, Vec2 { x: 200.0, y: 100.0 }, texture_pack.zombie.clone()),
                 Entity::make_zombie(3, Vec2 { x: 350.0, y: 150.0 }, texture_pack.zombie.clone()),
@@ -269,8 +273,10 @@ impl Engine {
 
     pub fn set_zombie_speed(&mut self) {
         for zombie in &mut self.zombies.iter_mut() {
-            let mut angle_to_target = (self.gladiator.position - zombie.position)
-                .angle_between(zombie.get_direction_vec());
+            let mut angle_to_target = zombie
+                .get_direction_vec()
+                .angle_between(self.gladiator.position - zombie.position);
+
             if angle_to_target.abs() >= MAX_ROTATION_SPEED {
                 if angle_to_target > 0.0 {
                     angle_to_target = MAX_ROTATION_SPEED;
@@ -278,11 +284,16 @@ impl Engine {
                     angle_to_target = -MAX_ROTATION_SPEED;
                 }
             }
+            if angle_to_target.abs() <= MIN_ROTATION_SPEED {
+                // to prevent shaking and fight float
+                // point operations
+                angle_to_target = 0.0;
+            }
+            zombie.direction_angle += angle_to_target;
             zombie.speed = Vec2 {
-                x: angle_to_target.cos() * 0.1,
-                y: angle_to_target.sin() * 0.1,
+                x: zombie.direction_angle.cos() * 0.8,
+                y: zombie.direction_angle.sin() * 0.8,
             };
-            zombie.direction_angle = angle_to_target;
         }
     }
 
@@ -486,16 +497,16 @@ async fn main() {
 
     loop {
         if is_key_down(KeyCode::W) {
-            engine.gladiator.speed.y += 1.0;
+            engine.gladiator.speed.y += 3.0;
         }
         if is_key_down(KeyCode::S) {
-            engine.gladiator.speed.y -= 1.0;
+            engine.gladiator.speed.y -= 3.0;
         }
         if is_key_down(KeyCode::A) {
-            engine.gladiator.speed.x -= 1.0;
+            engine.gladiator.speed.x -= 3.0;
         }
         if is_key_down(KeyCode::D) {
-            engine.gladiator.speed.x += 1.0;
+            engine.gladiator.speed.x += 3.0;
         }
         if is_key_down(KeyCode::Left) {
             engine.gladiator.direction_angle -= (0.1) / std::f32::consts::PI;
