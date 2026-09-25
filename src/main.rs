@@ -107,6 +107,8 @@ struct Entity {
     max_stamina: f32,
     stamina: f32,
     stamina_recovery_per_tick: f32,
+
+    animation_frame: u32,
 }
 
 impl Entity {
@@ -115,6 +117,11 @@ impl Entity {
         self.stamina += self.stamina_recovery_per_tick;
         if self.stamina >= self.max_stamina {
             self.stamina = self.max_stamina;
+        }
+        if self.animation_frame == 0 {
+            self.animation_frame = 1;
+        } else {
+            self.animation_frame = 0;
         }
     }
 
@@ -133,6 +140,7 @@ impl Entity {
             stamina: 100.0,
             stamina_recovery_per_tick: 1.0,
             texture: texture,
+            animation_frame: 0,
         };
     }
 
@@ -151,6 +159,7 @@ impl Entity {
             stamina: 100.0,
             stamina_recovery_per_tick: 1.0,
             texture: texture,
+            animation_frame: 0,
         };
     }
 
@@ -421,7 +430,12 @@ fn draw_entity(entity: &Entity, field: &Field) {
                 y: sprite_hw,
             }),
             rotation: -entity.direction_angle,
-            source: None,
+            source: Some(Rect {
+                x: 512.0 * entity.animation_frame as f32,
+                y: 0.0,
+                w: 512.0,
+                h: 512.0,
+            }),
             flip_x: false,
             flip_y: false,
             pivot: None,
@@ -475,7 +489,8 @@ fn draw_all(engine: &Engine) {
 }
 
 async fn load_textures() -> TexturePack {
-    let gladiator_texture = load_texture("assets/textures/gladiator.png").await.unwrap();
+    let gladiator_texture = load_texture("assets/textures/frames.png").await.unwrap();
+    // let gladiator_texture = load_texture("assets/textures/gladiator.png").await.unwrap();
     let zombie_texture = load_texture("assets/textures/zombie.png").await.unwrap();
 
     return TexturePack {
