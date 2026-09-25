@@ -1,205 +1,18 @@
+mod animation;
+mod engine;
+mod entity;
+
+use animation::Animation;
+use engine::Engine;
+use entity::Entity;
 use macroquad::prelude::*;
 
-type ID = u32;
-
-const RADIUS: f32 = 40.0;
-const MAX_ROTATION_SPEED: f32 = 0.01;
-const MIN_ROTATION_SPEED: f32 = 0.001;
+use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 struct TexturePack {
-    gladiator: Texture2D,
-    zombie: Texture2D,
-}
-
-#[derive(Debug, Clone)]
-struct Weapon {
-    cooldown_ticks: u32,
-    current_tick: u32,
-    damage_tick_start: u32,
-    damage_tick_end: u32,
-    damage: f32,
-    stamina_cost: f32,
-    range: f32,
-    damaged_this_cycle: Vec<ID>,
-    offset: f32,
-}
-
-impl Weapon {
-    pub const SPEAR: Self = Self {
-        cooldown_ticks: 50,
-        current_tick: 0,
-        damage_tick_start: 10,
-        damage_tick_end: 20,
-        damage: 10.0,
-        stamina_cost: 10.0,
-        range: 65.0,
-        damaged_this_cycle: vec![],
-        offset: RADIUS * 0.6,
-    };
-
-    pub const BITE: Self = Self {
-        cooldown_ticks: 100,
-        current_tick: 0,
-        damage_tick_start: 20,
-        damage_tick_end: 60,
-        damage: 8.0,
-        stamina_cost: 10.0,
-        range: 65.0,
-        damaged_this_cycle: vec![],
-        offset: 0.0,
-    };
-
-    pub fn can_attack(&self) -> bool {
-        return self.current_tick == 0;
-    }
-
-    pub fn is_attacking(&self) -> bool {
-        return self.current_tick != 0;
-    }
-
-    pub fn is_damaging(&self) -> bool {
-        return self.damage_tick_start <= self.current_tick
-            && self.current_tick <= self.damage_tick_end;
-    }
-
-    pub fn register_hit(&mut self, entity_id: ID) {
-        self.damaged_this_cycle.push(entity_id);
-    }
-
-    pub fn is_already_hit_this_cycle(&self, entity_id: &ID) -> bool {
-        return self.damaged_this_cycle.contains(entity_id);
-    }
-    pub fn attack(&mut self) {
-        if self.can_attack() {
-            self.current_tick = 1;
-        }
-    }
-
-    pub fn tick(&mut self) {
-        if self.is_attacking() {
-            self.current_tick += 1;
-            if self.current_tick >= self.cooldown_ticks {
-                self.current_tick = 0;
-                self.damaged_this_cycle.clear();
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Entity {
-    id: ID,
-
-    position: Vec2,
-    speed: Vec2,
-    mass: f32,
-    radius: f32,
-    direction_angle: f32,
-
-    texture: Texture2D,
-
-    max_hp: f32,
-    hp: f32,
-
-    weapon: Weapon,
-
-    max_stamina: f32,
-    stamina: f32,
-    stamina_recovery_per_tick: f32,
-
-    animation_frame: u32,
-}
-
-impl Entity {
-    pub fn tick(&mut self) {
-        self.weapon.tick();
-        self.stamina += self.stamina_recovery_per_tick;
-        if self.stamina >= self.max_stamina {
-            self.stamina = self.max_stamina;
-        }
-        if self.animation_frame == 0 {
-            self.animation_frame = 1;
-        } else {
-            self.animation_frame = 0;
-        }
-    }
-
-    pub fn make_gladiator(position: Vec2, texture: Texture2D) -> Self {
-        return Self {
-            id: 1,
-            position: position,
-            speed: Vec2::ZERO,
-            radius: RADIUS,
-            max_hp: 100.0,
-            hp: 100.0,
-            direction_angle: 0.0,
-            weapon: Weapon::SPEAR,
-            mass: 100.0,
-            max_stamina: 100.0,
-            stamina: 100.0,
-            stamina_recovery_per_tick: 1.0,
-            texture: texture,
-            animation_frame: 0,
-        };
-    }
-
-    pub fn make_zombie(id: ID, pos: Vec2, texture: Texture2D) -> Self {
-        return Self {
-            id: id,
-            position: pos,
-            speed: Vec2::ZERO,
-            radius: RADIUS,
-            max_hp: 30.0,
-            hp: 30.0,
-            direction_angle: 0.0,
-            weapon: Weapon::BITE,
-            mass: 10.0,
-            max_stamina: 100.0,
-            stamina: 100.0,
-            stamina_recovery_per_tick: 1.0,
-            texture: texture,
-            animation_frame: 0,
-        };
-    }
-
-    pub fn attack(&mut self) {
-        if self.stamina >= self.weapon.stamina_cost {
-            self.stamina -= self.weapon.stamina_cost;
-            self.weapon.attack();
-        }
-    }
-    pub fn is_attacking(&self) -> bool {
-        return self.weapon.is_attacking();
-    }
-
-    pub fn weapon_intersects_with(&self, entity: &Entity) -> bool {
-        if (self.get_attack_vec() - entity.position).length() < entity.radius {
-            return true;
-        }
-        return false;
-    }
-
-    pub fn intersects_with(&self, other: &Entity) -> bool {
-        let out = self.position.distance(other.position) < self.radius + other.radius;
-        return out;
-    }
-    pub fn get_direction_vec(&self) -> Vec2 {
-        return Vec2 {
-            x: self.direction_angle.cos(),
-            y: self.direction_angle.sin(),
-        };
-    }
-
-    pub fn get_attack_vec(&self) -> Vec2 {
-        return Vec2 {
-            x: self.direction_angle.cos() * self.weapon.range,
-            y: self.direction_angle.sin() * self.weapon.range,
-        } + Vec2 {
-            x: (self.direction_angle - std::f32::consts::PI / 2.0).cos() * self.weapon.offset,
-            y: (self.direction_angle - std::f32::consts::PI / 2.0).sin() * self.weapon.offset,
-        } + self.position;
-    }
+    gladiator: Rc<Texture2D>,
+    zombie: Rc<Texture2D>,
 }
 
 #[derive(Debug, Clone)]
@@ -208,267 +21,76 @@ struct Field {
     height: f32,
 }
 
-#[derive(Debug)]
-struct Engine {
-    gladiator: Entity,
-    zombies: Vec<Entity>,
-    field: Field,
-    game_ended: bool,
+trait Drawable {
+    fn draw(&self, field: &Field);
 }
 
-fn get_pushed_out_speeds(entity1: &Entity, entity2: &Entity) -> (Vec2, Vec2) {
-    let center_to_center_vector = entity1.position - entity2.position;
-    let min_not_pushable_distance = entity1.radius + entity2.radius;
-    if center_to_center_vector.length() >= min_not_pushable_distance {
-        return (Vec2::ZERO, Vec2::ZERO);
-    }
+impl Drawable for Entity {
+    fn draw(&self, field: &Field) {
+        let outer_radius = self.radius * 1.7;
+        draw_rectangle(
+            self.position.x - outer_radius * 0.5,
+            field.height - self.position.y - outer_radius - 5.0,
+            outer_radius,
+            10.0,
+            RED,
+        );
+        draw_rectangle(
+            self.position.x - outer_radius * 0.5,
+            field.height - self.position.y - outer_radius - 5.0,
+            outer_radius * (self.hp / self.max_hp),
+            10.0,
+            GREEN,
+        );
 
-    let mut push_coef = min_not_pushable_distance / center_to_center_vector.length();
-    push_coef = 0.01 * push_coef * push_coef * push_coef * push_coef * push_coef * push_coef;
+        let sprite_hw = outer_radius * 2.0;
 
-    return (
-        entity2.mass * push_coef / (entity1.mass + entity2.mass) * center_to_center_vector,
-        -entity1.mass * push_coef / (entity1.mass + entity2.mass) * center_to_center_vector,
-    );
-}
+        draw_texture_ex(
+            self.animation.get_texture(),
+            self.position.x - outer_radius,
+            field.height - (self.position.y + outer_radius),
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some(Vec2 {
+                    x: sprite_hw,
+                    y: sprite_hw,
+                }),
+                rotation: -self.direction_angle,
+                source: Some(self.animation.get_frame()),
+                flip_x: false,
+                flip_y: false,
+                pivot: None,
+            },
+        );
 
-impl Engine {
-    fn get_position_within_field(entity: &Entity, field: &Field) -> Vec2 {
-        let mut new_pos = entity.position;
+        draw_circle(
+            self.position.x,
+            field.height - self.position.y,
+            self.radius,
+            Color::new(0.0, 0.0, 0.0, 0.3),
+        );
 
-        if new_pos.x + entity.radius > field.width {
-            new_pos.x = field.width - entity.radius;
+        let e_direction = self.radius * self.get_direction_vec() + self.position;
+
+        draw_line(
+            self.position.x,
+            field.height - self.position.y,
+            e_direction.x,
+            field.height - e_direction.y,
+            4.0,
+            BLACK,
+        );
+
+        let e_attack = self.get_attack_vec();
+        let mut weapon_color = RED;
+        if self.weapon.is_attacking() {
+            weapon_color = ORANGE;
         }
-        if new_pos.x - entity.radius < 0.0 {
-            new_pos.x = entity.radius;
+        if self.weapon.is_damaging() {
+            weapon_color = BLACK;
         }
-        if new_pos.y + entity.radius > field.height {
-            new_pos.y = field.height - entity.radius;
-        }
-        if new_pos.y - entity.radius < 0.0 {
-            new_pos.y = entity.radius;
-        }
-
-        return new_pos;
+        draw_circle(e_attack.x, field.height - e_attack.y, 5.0, weapon_color)
     }
-
-    fn new(texture_pack: TexturePack, field: Field) -> Self {
-        let engine = Engine {
-            gladiator: Entity::make_gladiator(
-                Vec2 { x: 50.0, y: 50.0 },
-                texture_pack.gladiator.clone(),
-            ),
-            zombies: vec![
-                Entity::make_zombie(2, Vec2 { x: 200.0, y: 100.0 }, texture_pack.zombie.clone()),
-                Entity::make_zombie(3, Vec2 { x: 350.0, y: 150.0 }, texture_pack.zombie.clone()),
-                Entity::make_zombie(4, Vec2 { x: 500.0, y: 300.0 }, texture_pack.zombie.clone()),
-            ],
-            field: field,
-            game_ended: false,
-        };
-        return engine;
-    }
-
-    pub fn attack_by_gladiator(&mut self) {
-        self.gladiator.attack();
-    }
-    pub fn trigger_attack_by_zombies(&mut self) {
-        for zombie in self.zombies.iter_mut() {
-            if zombie.weapon_intersects_with(&self.gladiator) {
-                zombie.attack();
-            }
-        }
-    }
-
-    pub fn set_zombie_speed(&mut self) {
-        for zombie in &mut self.zombies.iter_mut() {
-            let mut angle_to_target = zombie
-                .get_direction_vec()
-                .angle_between(self.gladiator.position - zombie.position);
-
-            if angle_to_target.abs() >= MAX_ROTATION_SPEED {
-                if angle_to_target > 0.0 {
-                    angle_to_target = MAX_ROTATION_SPEED;
-                } else {
-                    angle_to_target = -MAX_ROTATION_SPEED;
-                }
-            }
-            if angle_to_target.abs() <= MIN_ROTATION_SPEED {
-                // to prevent shaking and fight float
-                // point operations
-                angle_to_target = 0.0;
-            }
-            zombie.direction_angle += angle_to_target;
-            zombie.speed = Vec2 {
-                x: zombie.direction_angle.cos() * 0.8,
-                y: zombie.direction_angle.sin() * 0.8,
-            };
-        }
-    }
-
-    fn remove_dead_zombies(&mut self) {
-        self.zombies = self
-            .zombies
-            .clone()
-            .into_iter()
-            .filter(|z| z.hp > 0.0)
-            .collect();
-    }
-
-    fn move_entitites(&mut self) {
-        let mut entities = std::iter::once(&mut self.gladiator)
-            .chain(self.zombies.iter_mut())
-            .collect::<Vec<&mut Entity>>();
-
-        for i in 0..entities.len() {
-            let mut collided_indexes = Vec::new();
-            for k in 0..entities.len() {
-                if i == k {
-                    continue;
-                }
-                if entities[i].intersects_with(entities[k]) {
-                    collided_indexes.push(k);
-                }
-            }
-            for k in collided_indexes {
-                let (new_speed1, new_speed2) = get_pushed_out_speeds(entities[i], entities[k]);
-                entities[i].speed += new_speed1;
-                entities[k].speed += new_speed2;
-            }
-
-            let speed = entities[i].speed;
-            entities[i].position += speed;
-            entities[i].speed *= 0.3; // slowing down?...
-            entities[i].position = Engine::get_position_within_field(entities[i], &self.field);
-        }
-    }
-
-    fn apply_damage(&mut self) {
-        let mut entities = std::iter::once(&mut self.gladiator)
-            .chain(self.zombies.iter_mut())
-            .collect::<Vec<&mut Entity>>();
-
-        for i in 0..entities.len() {
-            if !entities[i].is_attacking() {
-                continue;
-            }
-
-            for k in 0..entities.len() {
-                if i == k {
-                    continue;
-                }
-
-                let hit_id = entities[k].id;
-
-                if entities[i].weapon.is_already_hit_this_cycle(&hit_id) {
-                    continue;
-                }
-
-                if entities[i].weapon_intersects_with(entities[k]) {
-                    entities[k].hp -= entities[i].weapon.damage;
-                    entities[i].weapon.register_hit(hit_id);
-                }
-            }
-        }
-    }
-
-    fn end_game(&mut self) {
-        self.game_ended = true;
-    }
-
-    pub fn tick(&mut self) {
-        if self.game_ended {
-            return;
-        }
-        self.remove_dead_zombies();
-        self.set_zombie_speed();
-        self.move_entitites();
-        self.trigger_attack_by_zombies();
-        self.apply_damage();
-
-        let entities = std::iter::once(&mut self.gladiator)
-            .chain(self.zombies.iter_mut())
-            .collect::<Vec<&mut Entity>>();
-
-        for entity in entities {
-            entity.tick();
-        }
-
-        if self.gladiator.hp < 0.0 {
-            self.end_game()
-        }
-    }
-}
-
-fn draw_entity(entity: &Entity, field: &Field) {
-    let outer_radius = entity.radius * 1.7;
-    draw_rectangle(
-        entity.position.x - outer_radius * 0.5,
-        field.height - entity.position.y - outer_radius - 5.0,
-        outer_radius,
-        10.0,
-        RED,
-    );
-    draw_rectangle(
-        entity.position.x - outer_radius * 0.5,
-        field.height - entity.position.y - outer_radius - 5.0,
-        outer_radius * (entity.hp / entity.max_hp),
-        10.0,
-        GREEN,
-    );
-
-    let sprite_hw = outer_radius * 2.0;
-
-    draw_texture_ex(
-        &entity.texture,
-        entity.position.x - outer_radius,
-        field.height - (entity.position.y + outer_radius),
-        WHITE,
-        DrawTextureParams {
-            dest_size: Some(Vec2 {
-                x: sprite_hw,
-                y: sprite_hw,
-            }),
-            rotation: -entity.direction_angle,
-            source: Some(Rect {
-                x: 512.0 * entity.animation_frame as f32,
-                y: 0.0,
-                w: 512.0,
-                h: 512.0,
-            }),
-            flip_x: false,
-            flip_y: false,
-            pivot: None,
-        },
-    );
-
-    draw_circle(
-        entity.position.x,
-        field.height - entity.position.y,
-        entity.radius,
-        Color::new(0.0, 0.0, 0.0, 0.3),
-    );
-
-    let e_direction = entity.radius * entity.get_direction_vec() + entity.position;
-
-    draw_line(
-        entity.position.x,
-        field.height - entity.position.y,
-        e_direction.x,
-        field.height - e_direction.y,
-        4.0,
-        BLACK,
-    );
-
-    let e_attack = entity.get_attack_vec();
-    let mut weapon_color = RED;
-    if entity.weapon.is_attacking() {
-        weapon_color = ORANGE;
-    }
-    if entity.weapon.is_damaging() {
-        weapon_color = BLACK;
-    }
-    draw_circle(e_attack.x, field.height - e_attack.y, 5.0, weapon_color)
 }
 
 fn draw_interface(hp: f32, stamina: f32) {
@@ -479,24 +101,66 @@ fn draw_interface(hp: f32, stamina: f32) {
 
 fn draw_all(engine: &Engine) {
     clear_background(WHITE);
-    draw_entity(&engine.gladiator, &engine.field);
+    engine.gladiator.draw(&engine.field);
 
     for zombie in &engine.zombies {
-        draw_entity(zombie, &engine.field);
+        zombie.draw(&engine.field);
     }
 
     draw_interface(engine.gladiator.hp, engine.gladiator.stamina);
 }
 
 async fn load_textures() -> TexturePack {
-    let gladiator_texture = load_texture("assets/textures/frames.png").await.unwrap();
+    let gladiator_texture = Rc::new(load_texture("assets/textures/frames.png").await.unwrap());
     // let gladiator_texture = load_texture("assets/textures/gladiator.png").await.unwrap();
-    let zombie_texture = load_texture("assets/textures/zombie.png").await.unwrap();
+    let zombie_texture = Rc::new(load_texture("assets/textures/zombie.png").await.unwrap());
 
     return TexturePack {
         gladiator: gladiator_texture,
         zombie: zombie_texture,
     };
+}
+
+fn make_gladiator(texture_pack: &TexturePack) -> Entity {
+    return Entity::make_gladiator(
+        Vec2 { x: 50.0, y: 50.0 },
+        Animation::new(
+            Rc::clone(&texture_pack.gladiator),
+            vec![
+                (Rect::new(0.0, 0.0, 512.0, 512.0), 15),
+                (Rect::new(512.0, 0.0, 512.0, 512.0), 15),
+            ],
+        ),
+    );
+}
+
+fn make_zombies(texture_pack: &TexturePack) -> Vec<Entity> {
+    return vec![
+        Entity::make_zombie(
+            2,
+            Vec2 { x: 200.0, y: 100.0 },
+            Animation::new(
+                Rc::clone(&texture_pack.zombie),
+                vec![(Rect::new(0.0, 0.0, 997.0, 997.0), 15)],
+            ),
+        ),
+        Entity::make_zombie(
+            3,
+            Vec2 { x: 350.0, y: 150.0 },
+            Animation::new(
+                Rc::clone(&texture_pack.zombie),
+                vec![(Rect::new(0.0, 0.0, 997.0, 997.0), 15)],
+            ),
+        ),
+        Entity::make_zombie(
+            4,
+            Vec2 { x: 500.0, y: 300.0 },
+            Animation::new(
+                Rc::clone(&texture_pack.zombie),
+                vec![(Rect::new(0.0, 0.0, 997.0, 997.0), 15)],
+            ),
+        ),
+    ];
 }
 
 #[macroquad::main("Gladiator")]
@@ -508,20 +172,24 @@ async fn main() {
 
     let texture_pack = load_textures().await;
 
-    let mut engine = Engine::new(texture_pack.clone(), field.clone());
+    let mut engine = Engine::new(
+        make_gladiator(&texture_pack),
+        make_zombies(&texture_pack),
+        field.clone(),
+    );
 
     loop {
         if is_key_down(KeyCode::W) {
-            engine.gladiator.speed.y += 3.0;
+            engine.gladiator.speed.y += 1.0;
         }
         if is_key_down(KeyCode::S) {
-            engine.gladiator.speed.y -= 3.0;
+            engine.gladiator.speed.y -= 1.0;
         }
         if is_key_down(KeyCode::A) {
-            engine.gladiator.speed.x -= 3.0;
+            engine.gladiator.speed.x -= 1.0;
         }
         if is_key_down(KeyCode::D) {
-            engine.gladiator.speed.x += 3.0;
+            engine.gladiator.speed.x += 1.0;
         }
         if is_key_down(KeyCode::Left) {
             engine.gladiator.direction_angle -= (0.1) / std::f32::consts::PI;
@@ -533,14 +201,23 @@ async fn main() {
             engine.attack_by_gladiator()
         }
         if is_key_down(KeyCode::R) {
-            engine = Engine::new(texture_pack.clone(), field.clone());
+            engine = Engine::new(
+                make_gladiator(&texture_pack),
+                make_zombies(&texture_pack),
+                field.clone(),
+            );
         }
         if is_key_down(KeyCode::Q) {
             return;
         }
 
         draw_all(&engine);
+
         engine.tick();
+
+        for entity in engine.get_entities().iter_mut() {
+            entity.animation.tick();
+        }
 
         next_frame().await
     }
