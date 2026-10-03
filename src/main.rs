@@ -11,7 +11,8 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 struct TexturePack {
-    gladiator: Rc<Texture2D>,
+    gladiator_attack: Rc<Texture2D>,
+    gladiator_walk: Rc<Texture2D>,
     zombie: Rc<Texture2D>,
 }
 
@@ -46,7 +47,7 @@ impl Drawable for Entity {
         let sprite_hw = outer_radius * 2.0;
 
         draw_texture_ex(
-            self.animation.get_texture(),
+            self.walk_animation.get_texture(),
             self.position.x - outer_radius,
             field.height - (self.position.y + outer_radius),
             WHITE,
@@ -56,7 +57,24 @@ impl Drawable for Entity {
                     y: sprite_hw,
                 }),
                 rotation: -self.direction_angle,
-                source: Some(self.animation.get_frame()),
+                source: Some(self.walk_animation.get_frame()),
+                flip_x: false,
+                flip_y: false,
+                pivot: None,
+            },
+        );
+        draw_texture_ex(
+            self.attack_animation.get_texture(),
+            self.position.x - outer_radius,
+            field.height - (self.position.y + outer_radius),
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some(Vec2 {
+                    x: sprite_hw,
+                    y: sprite_hw,
+                }),
+                rotation: -self.direction_angle,
+                source: Some(self.attack_animation.get_frame()),
                 flip_x: false,
                 flip_y: false,
                 pivot: None,
@@ -111,56 +129,64 @@ fn draw_all(engine: &Engine) {
 }
 
 async fn load_textures() -> TexturePack {
-    let gladiator_texture = Rc::new(load_texture("assets/textures/frames.png").await.unwrap());
-    // let gladiator_texture = load_texture("assets/textures/gladiator.png").await.unwrap();
+    let walk_texture = Rc::new(load_texture("assets/textures/walking.png").await.unwrap());
+    let attack_texture = Rc::new(load_texture("assets/textures/attacking.png").await.unwrap());
     let zombie_texture = Rc::new(load_texture("assets/textures/zombie.png").await.unwrap());
 
     return TexturePack {
-        gladiator: gladiator_texture,
+        gladiator_walk: walk_texture,
+        gladiator_attack: attack_texture,
         zombie: zombie_texture,
     };
 }
 
 fn make_gladiator(texture_pack: &TexturePack) -> Entity {
+    let mut attack_vec = vec![];
+    for i in 0..7 {
+        attack_vec.push((Rect::new(256.0 * (i as f32), 0.0, 256.0, 256.0), 15));
+    }
     return Entity::make_gladiator(
         Vec2 { x: 50.0, y: 50.0 },
         Animation::new(
-            Rc::clone(&texture_pack.gladiator),
+            Rc::clone(&texture_pack.gladiator_walk),
             vec![
-                (Rect::new(0.0, 0.0, 512.0, 512.0), 15),
-                (Rect::new(512.0, 0.0, 512.0, 512.0), 15),
+                (Rect::new(0.0, 0.0, 256.0, 256.0), 15),
+                (Rect::new(256.0, 0.0, 256.0, 256.0), 15),
+                (Rect::new(512.0, 0.0, 256.0, 256.0), 15),
             ],
         ),
+        Animation::new(Rc::clone(&texture_pack.gladiator_attack), attack_vec),
     );
 }
 
 fn make_zombies(texture_pack: &TexturePack) -> Vec<Entity> {
-    return vec![
-        Entity::make_zombie(
-            2,
-            Vec2 { x: 200.0, y: 100.0 },
-            Animation::new(
-                Rc::clone(&texture_pack.zombie),
-                vec![(Rect::new(0.0, 0.0, 997.0, 997.0), 15)],
-            ),
-        ),
-        Entity::make_zombie(
-            3,
-            Vec2 { x: 350.0, y: 150.0 },
-            Animation::new(
-                Rc::clone(&texture_pack.zombie),
-                vec![(Rect::new(0.0, 0.0, 997.0, 997.0), 15)],
-            ),
-        ),
-        Entity::make_zombie(
-            4,
-            Vec2 { x: 500.0, y: 300.0 },
-            Animation::new(
-                Rc::clone(&texture_pack.zombie),
-                vec![(Rect::new(0.0, 0.0, 997.0, 997.0), 15)],
-            ),
-        ),
-    ];
+    return vec![];
+    // return vec![
+    //     Entity::make_zombie(
+    //         2,
+    //         Vec2 { x: 200.0, y: 100.0 },
+    //         Animation::new(
+    //             Rc::clone(&texture_pack.zombie),
+    //             vec![(Rect::new(0.0, 0.0, 997.0, 997.0), 15)],
+    //         ),
+    //     ),
+    //     Entity::make_zombie(
+    //         3,
+    //         Vec2 { x: 350.0, y: 150.0 },
+    //         Animation::new(
+    //             Rc::clone(&texture_pack.zombie),
+    //             vec![(Rect::new(0.0, 0.0, 997.0, 997.0), 15)],
+    //         ),
+    //     ),
+    //     Entity::make_zombie(
+    //         4,
+    //         Vec2 { x: 500.0, y: 300.0 },
+    //         Animation::new(
+    //             Rc::clone(&texture_pack.zombie),
+    //             vec![(Rect::new(0.0, 0.0, 997.0, 997.0), 15)],
+    //         ),
+    //     ),
+    // ];
 }
 
 #[macroquad::main("Gladiator")]
@@ -216,7 +242,12 @@ async fn main() {
         engine.tick();
 
         for entity in engine.get_entities().iter_mut() {
-            entity.animation.tick();
+            if entity.speed.length() > 0.1 {
+                entity.walk_animation.tick();
+            }
+            if entity.is_attacking() {
+                entity.attack_animation.tick();
+            }
         }
 
         next_frame().await

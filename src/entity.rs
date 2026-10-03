@@ -14,7 +14,8 @@ pub struct Entity {
     pub radius: f32,
     pub direction_angle: f32,
 
-    pub animation: Animation,
+    pub walk_animation: Animation,
+    pub attack_animation: Animation,
 
     pub max_hp: f32,
     pub hp: f32,
@@ -35,7 +36,11 @@ impl Entity {
         }
     }
 
-    pub fn make_gladiator(position: Vec2, animation: Animation) -> Self {
+    pub fn make_gladiator(
+        position: Vec2,
+        walk_animation: Animation,
+        attack_animation: Animation,
+    ) -> Self {
         return Self {
             id: 1,
             position: position,
@@ -49,11 +54,17 @@ impl Entity {
             max_stamina: 100.0,
             stamina: 100.0,
             stamina_recovery_per_tick: 1.0,
-            animation: animation,
+            walk_animation: walk_animation,
+            attack_animation: attack_animation,
         };
     }
 
-    pub fn make_zombie(id: ID, pos: Vec2, animation: Animation) -> Self {
+    pub fn make_zombie(
+        id: ID,
+        pos: Vec2,
+        walk_animation: Animation,
+        attack_animation: Animation,
+    ) -> Self {
         return Self {
             id: id,
             position: pos,
@@ -67,7 +78,8 @@ impl Entity {
             max_stamina: 100.0,
             stamina: 100.0,
             stamina_recovery_per_tick: 1.0,
-            animation: animation,
+            walk_animation: walk_animation,
+            attack_animation: attack_animation,
         };
     }
 
