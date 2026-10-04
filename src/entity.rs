@@ -1,3 +1,5 @@
+use std::{collections::VecDeque, rc::Rc};
+
 use crate::animation::Animation;
 use macroquad::prelude::*;
 
@@ -21,6 +23,7 @@ pub struct Entity {
     pub hp: f32,
 
     pub weapon: Weapon,
+    pub footstep_tracker: FootstepTracker,
 
     pub max_stamina: f32,
     pub stamina: f32,
@@ -30,6 +33,7 @@ pub struct Entity {
 impl Entity {
     pub fn tick(&mut self) {
         self.weapon.tick();
+        self.footstep_tracker.tick();
         self.stamina += self.stamina_recovery_per_tick;
         if self.stamina >= self.max_stamina {
             self.stamina = self.max_stamina;
@@ -40,6 +44,7 @@ impl Entity {
         position: Vec2,
         walk_animation: Animation,
         attack_animation: Animation,
+        step_texture: Rc<Texture2D>,
     ) -> Self {
         return Self {
             id: 1,
@@ -50,6 +55,7 @@ impl Entity {
             hp: 100.0,
             direction_angle: 0.0,
             weapon: Weapon::SPEAR,
+            footstep_tracker: FootstepTracker::new(step_texture),
             mass: 100.0,
             max_stamina: 100.0,
             stamina: 100.0,
@@ -64,6 +70,7 @@ impl Entity {
         pos: Vec2,
         walk_animation: Animation,
         attack_animation: Animation,
+        step_texture: Rc<Texture2D>,
     ) -> Self {
         return Self {
             id: id,
@@ -74,6 +81,7 @@ impl Entity {
             hp: 30.0,
             direction_angle: 0.0,
             weapon: Weapon::BITE,
+            footstep_tracker: FootstepTracker::new(step_texture),
             mass: 10.0,
             max_stamina: 100.0,
             stamina: 100.0,
@@ -119,6 +127,16 @@ impl Entity {
             x: (self.direction_angle - std::f32::consts::PI / 2.0).cos() * self.weapon.offset,
             y: (self.direction_angle - std::f32::consts::PI / 2.0).sin() * self.weapon.offset,
         } + self.position;
+    }
+
+    pub fn move_self(&mut self) {
+        self.position += self.speed;
+        self.footstep_tracker.add_movement(
+            self.speed.length(),
+            self.position,
+            self.direction_angle,
+        );
+        self.speed *= 0.3; // slowing down?...
     }
 }
 
@@ -193,6 +211,64 @@ impl Weapon {
                 self.current_tick = 0;
                 self.damaged_this_cycle.clear();
             }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Footstep {
+    pub texture: Rc<Texture2D>,
+    pub position: Vec2,
+    pub direction_angle: f32,
+    pub should_mirror: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct FootstepTracker {
+    distance_since_last: f32,
+    current_direction_angle: f32,
+    current_position: Vec2,
+    distance_per_step: f32,
+    pub footsteps: VecDeque<Footstep>,
+    texture: Rc<Texture2D>,
+}
+
+impl FootstepTracker {
+    fn new(texture: Rc<Texture2D>) -> Self {
+        return Self {
+            distance_since_last: 0.0,
+            current_direction_angle: 0.0,
+            current_position: Vec2::ZERO,
+            distance_per_step: 20.0,
+            footsteps: VecDeque::new(),
+            texture: texture,
+        };
+    }
+
+    fn add_movement(&mut self, distance: f32, position: Vec2, direction_angle: f32) {
+        self.distance_since_last += distance;
+        self.current_direction_angle = direction_angle;
+        self.current_position = position;
+    }
+
+    fn tick(&mut self) {
+        if self.distance_since_last >= self.distance_per_step {
+            let mut should_mirror = false;
+            if let Some(f) = self.footsteps.back() {
+                should_mirror = !f.should_mirror;
+            }
+            self.footsteps.push_back(Footstep {
+                texture: Rc::clone(&self.texture),
+                direction_angle: self.current_direction_angle,
+                position: self.current_position,
+                should_mirror: should_mirror,
+            });
+
+            if self.footsteps.len() > 20 {
+                // my magic max number of steps
+                self.footsteps.pop_front();
+            }
+            self.distance_since_last = 0.0;
         }
     }
 }

@@ -7,12 +7,13 @@ use engine::Engine;
 use entity::Entity;
 use macroquad::prelude::*;
 
-use std::rc::Rc;
+use std::{f32::consts::PI, rc::Rc};
 
 #[derive(Debug, Clone)]
 struct TexturePack {
     gladiator_attack: Rc<Texture2D>,
     gladiator_walk: Rc<Texture2D>,
+    gladiator_step: Rc<Texture2D>,
     zombie: Rc<Texture2D>,
 }
 
@@ -44,6 +45,23 @@ impl Drawable for Entity {
             GREEN,
         );
 
+        for step in self.footstep_tracker.footsteps.iter() {
+            draw_texture_ex(
+                &step.texture,
+                step.position.x - self.radius, // - (10.0 * (-1 as i32).pow(step.should_mirror as u32) as f32),
+                field.height - (step.position.y + self.radius),
+                WHITE,
+                DrawTextureParams {
+                    dest_size: None,
+                    rotation: -step.direction_angle + PI / 2.0,
+                    source: None,
+                    flip_x: step.should_mirror,
+                    flip_y: false,
+                    pivot: None,
+                },
+            );
+        }
+
         let sprite_hw = outer_radius * 2.0;
 
         draw_texture_ex(
@@ -56,7 +74,7 @@ impl Drawable for Entity {
                     x: sprite_hw,
                     y: sprite_hw,
                 }),
-                rotation: -self.direction_angle,
+                rotation: -self.direction_angle - PI / 2.0,
                 source: Some(self.walk_animation.get_frame()),
                 flip_x: false,
                 flip_y: false,
@@ -73,7 +91,7 @@ impl Drawable for Entity {
                     x: sprite_hw,
                     y: sprite_hw,
                 }),
-                rotation: -self.direction_angle,
+                rotation: -self.direction_angle - PI / 2.0,
                 source: Some(self.attack_animation.get_frame()),
                 flip_x: false,
                 flip_y: false,
@@ -132,10 +150,16 @@ async fn load_textures() -> TexturePack {
     let walk_texture = Rc::new(load_texture("assets/textures/walking.png").await.unwrap());
     let attack_texture = Rc::new(load_texture("assets/textures/attacking.png").await.unwrap());
     let zombie_texture = Rc::new(load_texture("assets/textures/zombie.png").await.unwrap());
+    let gladiator_step_texture = Rc::new(
+        load_texture("assets/textures/footstep_left.png")
+            .await
+            .unwrap(),
+    );
 
     return TexturePack {
         gladiator_walk: walk_texture,
         gladiator_attack: attack_texture,
+        gladiator_step: gladiator_step_texture,
         zombie: zombie_texture,
     };
 }
@@ -156,6 +180,7 @@ fn make_gladiator(texture_pack: &TexturePack) -> Entity {
             ],
         ),
         Animation::new(Rc::clone(&texture_pack.gladiator_attack), attack_vec),
+        Rc::clone(&texture_pack.gladiator_step),
     );
 }
 

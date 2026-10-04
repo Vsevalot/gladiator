@@ -110,10 +110,7 @@ impl Engine {
                 entities[i].speed += new_speed1;
                 entities[k].speed += new_speed2;
             }
-
-            let speed = entities[i].speed;
-            entities[i].position += speed;
-            entities[i].speed *= 0.3; // slowing down?...
+            entities[i].move_self();
             entities[i].position = Engine::get_position_within_field(entities[i], &self.field);
         }
     }
