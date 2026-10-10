@@ -12,6 +12,7 @@ pub struct Engine {
     pub zombies: Vec<Entity>,
     pub field: Field,
     pub game_ended: bool,
+    pub global_tick: u32,
 }
 
 impl Engine {
@@ -40,6 +41,7 @@ impl Engine {
             zombies: zombies,
             field: field,
             game_ended: false,
+            global_tick: 0,
         };
         return engine;
     }
@@ -152,6 +154,8 @@ impl Engine {
         if self.game_ended {
             return;
         }
+        self.global_tick += 1;
+
         self.remove_dead_zombies();
         self.set_zombie_speed();
         self.move_entitites();
@@ -163,7 +167,7 @@ impl Engine {
             .collect::<Vec<&mut Entity>>();
 
         for entity in entities {
-            entity.tick();
+            entity.tick(self.global_tick);
         }
 
         if self.gladiator.hp < 0.0 {

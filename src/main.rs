@@ -24,13 +24,13 @@ struct Field {
 }
 
 trait Drawable {
-    fn draw(&self, field: &Field);
+    fn draw(&self, field: &Field, global_tick: u32);
 }
 
 impl Drawable for Entity {
-    fn draw(&self, field: &Field) {
+    fn draw(&self, field: &Field, global_tick: u32) {
         self.draw_status(field);
-        self.draw_steps(field);
+        self.draw_steps(field, global_tick);
         self.draw_hitbox(field);
 
         if self.is_attacking() {
@@ -87,10 +87,10 @@ fn draw_interface(hp: f32, stamina: f32) {
 
 fn draw_all(engine: &Engine) {
     clear_background(WHITE);
-    engine.gladiator.draw(&engine.field);
+    engine.gladiator.draw(&engine.field, engine.global_tick);
 
     for zombie in &engine.zombies {
-        zombie.draw(&engine.field);
+        zombie.draw(&engine.field, engine.global_tick);
     }
 
     draw_interface(engine.gladiator.hp, engine.gladiator.stamina);

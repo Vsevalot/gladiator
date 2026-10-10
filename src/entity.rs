@@ -31,9 +31,9 @@ pub struct Entity {
 }
 
 impl Entity {
-    pub fn tick(&mut self) {
-        self.weapon.tick();
-        self.footstep_tracker.tick();
+    pub fn tick(&mut self, global_tick: u32) {
+        self.weapon.tick(global_tick);
+        self.footstep_tracker.tick(global_tick);
         self.stamina += self.stamina_recovery_per_tick;
         if self.stamina >= self.max_stamina {
             self.stamina = self.max_stamina;
@@ -177,7 +177,7 @@ impl Entity {
         draw_circle(e_attack.x, field.height - e_attack.y, 5.0, weapon_color)
     }
 
-    pub fn draw_steps(&self, field: &Field) {
+    pub fn draw_steps(&self, field: &Field, global_tick: u32) {
         for step in self.footstep_tracker.footsteps.iter() {
             draw_texture_ex(
                 &step.texture,
@@ -187,7 +187,9 @@ impl Entity {
                     r: (1.0),
                     g: (1.0),
                     b: (1.0),
-                    a: (step.opacity),
+                    a: (1.0
+                        - (global_tick - step.created_at_tick) as f32
+                            / self.footstep_tracker.footstep_lifetime as f32),
                 },
                 DrawTextureParams {
                     dest_size: None,
@@ -275,7 +277,7 @@ impl Weapon {
         }
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, _: u32) {
         if self.is_attacking() {
             self.current_tick += 1;
             if self.current_tick >= self.cooldown_ticks {
@@ -292,7 +294,7 @@ pub struct Footstep {
     pub position: Vec2,
     pub direction_angle: f32,
     pub should_mirror: bool,
-    pub opacity: f32,
+    pub created_at_tick: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -303,6 +305,7 @@ pub struct FootstepTracker {
     distance_per_step: f32,
     pub footsteps: VecDeque<Footstep>,
     texture: Rc<Texture2D>,
+    pub footstep_lifetime: u32,
 }
 
 impl FootstepTracker {
@@ -314,6 +317,7 @@ impl FootstepTracker {
             distance_per_step: 20.0,
             footsteps: VecDeque::new(),
             texture: texture,
+            footstep_lifetime: 1000,
         };
     }
 
@@ -323,7 +327,7 @@ impl FootstepTracker {
         self.current_position = position;
     }
 
-    fn tick(&mut self) {
+    fn tick(&mut self, global_tick: u32) {
         if self.distance_since_last >= self.distance_per_step {
             let mut should_mirror = false;
             if let Some(f) = self.footsteps.back() {
@@ -334,16 +338,15 @@ impl FootstepTracker {
                 direction_angle: self.current_direction_angle,
                 position: self.current_position,
                 should_mirror: should_mirror,
-                opacity: 1.0,
+                created_at_tick: global_tick,
             });
 
-            if self.footsteps.len() > 20 {
-                // my magic max number of steps
-                self.footsteps.pop_front();
-            }
-            for step in self.footsteps.iter_mut() {
-                step.opacity -= 0.05
-            }
+            self.footsteps = self
+                .footsteps
+                .clone()
+                .into_iter()
+                .filter(|f| f.created_at_tick + self.footstep_lifetime > global_tick)
+                .collect();
             self.distance_since_last = 0.0;
         }
     }
