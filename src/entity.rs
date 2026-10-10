@@ -143,14 +143,14 @@ impl Entity {
         // HP
         draw_rectangle(
             self.position.x - self.radius * 0.5,
-            field.height - self.position.y - self.radius - 15.0,
+            field.height - self.position.y - self.radius - 37.0,
             self.radius,
             10.0,
             RED,
         );
         draw_rectangle(
             self.position.x - self.radius * 0.5,
-            field.height - self.position.y - self.radius - 15.0,
+            field.height - self.position.y - self.radius - 37.0,
             self.radius * (self.hp / self.max_hp),
             10.0,
             GREEN,
@@ -189,7 +189,8 @@ impl Entity {
                     b: (1.0),
                     a: (1.0
                         - (global_tick - step.created_at_tick) as f32
-                            / self.footstep_tracker.footstep_lifetime as f32),
+                            / self.footstep_tracker.footstep_lifetime as f32)
+                        - 0.5,
                 },
                 DrawTextureParams {
                     dest_size: None,
@@ -215,8 +216,8 @@ impl Entity {
 
 #[derive(Debug, Clone)]
 pub struct Weapon {
+    state: WeaponState,
     cooldown_ticks: u32,
-    current_tick: u32,
     damage_tick_start: u32,
     damage_tick_end: u32,
     pub damage: f32,
@@ -226,22 +227,30 @@ pub struct Weapon {
     offset: f32,
 }
 
+pub const TICKS_PER_FRAME: u32 = 4;
+
+#[derive(Debug, Clone)]
+enum WeaponState {
+    Idle,
+    Attacking(u32),
+}
+
 impl Weapon {
     pub const SPEAR: Self = Self {
-        cooldown_ticks: 100 * 15,
-        current_tick: 0,
-        damage_tick_start: 100 * 8,
-        damage_tick_end: 100 * 12,
+        cooldown_ticks: TICKS_PER_FRAME * 15,
+        state: WeaponState::Idle,
+        damage_tick_start: TICKS_PER_FRAME * 8,
+        damage_tick_end: TICKS_PER_FRAME * 11,
         damage: 10.0,
         stamina_cost: 10.0,
-        range: 65.0,
+        range: 130.0,
         damaged_this_cycle: vec![],
         offset: RADIUS * 0.6,
     };
 
     pub const BITE: Self = Self {
         cooldown_ticks: 100,
-        current_tick: 0,
+        state: WeaponState::Idle,
         damage_tick_start: 20,
         damage_tick_end: 60,
         damage: 8.0,
@@ -251,17 +260,20 @@ impl Weapon {
         offset: 0.0,
     };
 
-    pub fn can_attack(&self) -> bool {
-        return self.current_tick == 0;
-    }
-
     pub fn is_attacking(&self) -> bool {
-        return self.current_tick != 0;
+        return match self.state {
+            WeaponState::Idle => false,
+            WeaponState::Attacking(_) => true,
+        };
     }
 
     pub fn is_damaging(&self) -> bool {
-        return self.damage_tick_start <= self.current_tick
-            && self.current_tick <= self.damage_tick_end;
+        return match self.state {
+            WeaponState::Attacking(current_tick) => {
+                self.damage_tick_start <= current_tick && current_tick <= self.damage_tick_end
+            }
+            WeaponState::Idle => false,
+        };
     }
 
     pub fn register_hit(&mut self, entity_id: ID) {
@@ -272,16 +284,16 @@ impl Weapon {
         return self.damaged_this_cycle.contains(entity_id);
     }
     pub fn attack(&mut self) {
-        if self.can_attack() {
-            self.current_tick = 1;
+        if let WeaponState::Idle = self.state {
+            self.state = WeaponState::Attacking(0);
         }
     }
 
     pub fn tick(&mut self, _: u32) {
-        if self.is_attacking() {
-            self.current_tick += 1;
-            if self.current_tick >= self.cooldown_ticks {
-                self.current_tick = 0;
+        if let WeaponState::Attacking(current_tick) = self.state {
+            self.state = WeaponState::Attacking(current_tick + 1);
+            if current_tick >= self.cooldown_ticks {
+                self.state = WeaponState::Idle;
                 self.damaged_this_cycle.clear();
             }
         }
@@ -317,7 +329,7 @@ impl FootstepTracker {
             distance_per_step: 20.0,
             footsteps: VecDeque::new(),
             texture: texture,
-            footstep_lifetime: 1000,
+            footstep_lifetime: 300,
         };
     }
 

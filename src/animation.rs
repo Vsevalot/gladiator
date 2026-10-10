@@ -5,13 +5,13 @@ use macroquad::prelude::*;
 #[derive(Debug, Clone)]
 pub struct Animation {
     texture: Rc<Texture2D>,
-    frames: Vec<(Rect, i32)>,
+    frames: Vec<(Rect, u32)>,
     current_frame: usize,
-    current_tick: i32,
+    current_tick: u32,
 }
 
 impl Animation {
-    pub fn new(texture: Rc<Texture2D>, frames: Vec<(Rect, i32)>) -> Self {
+    pub fn new(texture: Rc<Texture2D>, frames: Vec<(Rect, u32)>) -> Self {
         return Self {
             texture: texture,
             frames: frames,
@@ -25,7 +25,7 @@ impl Animation {
 
         self.current_tick += 1;
 
-        if self.current_tick > ticks_per_frame {
+        if self.current_tick >= ticks_per_frame {
             self.current_tick = 0;
             self.current_frame += 1;
             if self.current_frame >= self.frames.len() {

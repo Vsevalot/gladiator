@@ -4,7 +4,7 @@ mod entity;
 
 use animation::Animation;
 use engine::Engine;
-use entity::Entity;
+use entity::{Entity, TICKS_PER_FRAME};
 use macroquad::prelude::*;
 
 use std::{f32::consts::PI, rc::Rc};
@@ -36,7 +36,7 @@ impl Drawable for Entity {
         if self.is_attacking() {
             let texture_sector = self.attack_animation.get_frame();
             let mut frame = self.attack_animation.get_frame();
-            frame.scale(1.5, 1.5);
+            frame.scale(2.0, 2.0);
             draw_texture_ex(
                 self.attack_animation.get_texture(),
                 self.position.x - frame.h / 2.0,
@@ -57,7 +57,7 @@ impl Drawable for Entity {
         } else {
             let texture_sector = self.walk_animation.get_frame();
             let mut frame = self.walk_animation.get_frame();
-            frame.scale(1.5, 1.5);
+            frame.scale(2.0, 2.0);
             draw_texture_ex(
                 self.walk_animation.get_texture(),
                 self.position.x - frame.h / 2.0,
@@ -125,12 +125,18 @@ async fn load_textures() -> TexturePack {
 fn make_gladiator(texture_pack: &TexturePack) -> Entity {
     let mut attack_vec = vec![];
     for i in 0..15 {
-        attack_vec.push((Rect::new(256.0 * (i as f32), 0.0, 256.0, 256.0), 100));
+        attack_vec.push((
+            Rect::new(256.0 * (i as f32), 0.0, 256.0, 256.0),
+            TICKS_PER_FRAME,
+        ));
     }
 
     let mut walk_vec = vec![];
     for i in 0..8 {
-        walk_vec.push((Rect::new(256.0 * (i as f32), 0.0, 256.0, 256.0), 8));
+        walk_vec.push((
+            Rect::new(256.0 * (i as f32), 0.0, 256.0, 256.0),
+            TICKS_PER_FRAME*2,
+        ));
     }
     return Entity::make_gladiator(
         Vec2 { x: 50.0, y: 50.0 },
