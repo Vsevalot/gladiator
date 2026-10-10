@@ -4,7 +4,7 @@ use crate::animation::Animation;
 use macroquad::prelude::*;
 
 type ID = u32;
-const RADIUS: f32 = 40.0;
+const RADIUS: f32 = 100.0;
 
 #[derive(Debug, Clone)]
 pub struct Entity {

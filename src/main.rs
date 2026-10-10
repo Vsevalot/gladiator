@@ -147,18 +147,26 @@ fn draw_all(engine: &Engine) {
 }
 
 async fn load_textures() -> TexturePack {
-    let walk_texture = Rc::new(load_texture("assets/textures/walking.png").await.unwrap());
-    let attack_texture = Rc::new(load_texture("assets/textures/attacking.png").await.unwrap());
-    let zombie_texture = Rc::new(load_texture("assets/textures/zombie.png").await.unwrap());
-    let gladiator_step_texture = Rc::new(
-        load_texture("assets/textures/footstep_left.png")
+    let gladiator_walk_texture = Rc::new(
+        load_texture("assets/textures/real/gladiator_walking.png")
             .await
             .unwrap(),
     );
+    let gladiator_attack_texture = Rc::new(
+        load_texture("assets/textures/real/gladiator_attack.png")
+            .await
+            .unwrap(),
+    );
+    let gladiator_step_texture = Rc::new(
+        load_texture("assets/textures/real/footstep_left.png")
+            .await
+            .unwrap(),
+    );
+    let zombie_texture = Rc::new(load_texture("assets/textures/ai/zombie.png").await.unwrap());
 
     return TexturePack {
-        gladiator_walk: walk_texture,
-        gladiator_attack: attack_texture,
+        gladiator_walk: gladiator_walk_texture,
+        gladiator_attack: gladiator_attack_texture,
         gladiator_step: gladiator_step_texture,
         zombie: zombie_texture,
     };
@@ -166,19 +174,17 @@ async fn load_textures() -> TexturePack {
 
 fn make_gladiator(texture_pack: &TexturePack) -> Entity {
     let mut attack_vec = vec![];
-    for i in 0..7 {
+    for i in 0..15 {
         attack_vec.push((Rect::new(256.0 * (i as f32), 0.0, 256.0, 256.0), 15));
+    }
+
+    let mut walk_vec = vec![];
+    for i in 0..8 {
+        walk_vec.push((Rect::new(256.0 * (i as f32), 0.0, 256.0, 256.0), 8));
     }
     return Entity::make_gladiator(
         Vec2 { x: 50.0, y: 50.0 },
-        Animation::new(
-            Rc::clone(&texture_pack.gladiator_walk),
-            vec![
-                (Rect::new(0.0, 0.0, 256.0, 256.0), 15),
-                (Rect::new(256.0, 0.0, 256.0, 256.0), 15),
-                (Rect::new(512.0, 0.0, 256.0, 256.0), 15),
-            ],
-        ),
+        Animation::new(Rc::clone(&texture_pack.gladiator_walk), walk_vec),
         Animation::new(Rc::clone(&texture_pack.gladiator_attack), attack_vec),
         Rc::clone(&texture_pack.gladiator_step),
     );
