@@ -29,103 +29,53 @@ trait Drawable {
 
 impl Drawable for Entity {
     fn draw(&self, field: &Field) {
-        let outer_radius = self.radius * 1.7;
-        draw_rectangle(
-            self.position.x - outer_radius * 0.5,
-            field.height - self.position.y - outer_radius - 5.0,
-            outer_radius,
-            10.0,
-            RED,
-        );
-        draw_rectangle(
-            self.position.x - outer_radius * 0.5,
-            field.height - self.position.y - outer_radius - 5.0,
-            outer_radius * (self.hp / self.max_hp),
-            10.0,
-            GREEN,
-        );
+        self.draw_status(field);
+        self.draw_steps(field);
+        self.draw_hitbox(field);
 
-        for step in self.footstep_tracker.footsteps.iter() {
+        if self.is_attacking() {
+            let texture_sector = self.attack_animation.get_frame();
+            let mut frame = self.attack_animation.get_frame();
+            frame.scale(1.5, 1.5);
             draw_texture_ex(
-                &step.texture,
-                step.position.x - self.radius, // - (10.0 * (-1 as i32).pow(step.should_mirror as u32) as f32),
-                field.height - (step.position.y + self.radius),
+                self.attack_animation.get_texture(),
+                self.position.x - frame.h / 2.0,
+                field.height - (self.position.y + frame.h / 2.0),
                 WHITE,
                 DrawTextureParams {
-                    dest_size: None,
-                    rotation: -step.direction_angle + PI / 2.0,
-                    source: None,
-                    flip_x: step.should_mirror,
+                    dest_size: Some(Vec2 {
+                        x: frame.h,
+                        y: frame.h,
+                    }),
+                    rotation: -self.direction_angle + PI / 2.0,
+                    source: Some(texture_sector),
+                    flip_x: false,
+                    flip_y: false,
+                    pivot: None,
+                },
+            );
+        } else {
+            let texture_sector = self.walk_animation.get_frame();
+            let mut frame = self.walk_animation.get_frame();
+            frame.scale(1.5, 1.5);
+            draw_texture_ex(
+                self.walk_animation.get_texture(),
+                self.position.x - frame.h / 2.0,
+                field.height - (self.position.y + frame.h / 2.0),
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(Vec2 {
+                        x: frame.h,
+                        y: frame.h,
+                    }),
+                    rotation: -self.direction_angle + PI / 2.0,
+                    source: Some(texture_sector),
+                    flip_x: false,
                     flip_y: false,
                     pivot: None,
                 },
             );
         }
-
-        let sprite_hw = outer_radius * 2.0;
-
-        draw_texture_ex(
-            self.walk_animation.get_texture(),
-            self.position.x - outer_radius,
-            field.height - (self.position.y + outer_radius),
-            WHITE,
-            DrawTextureParams {
-                dest_size: Some(Vec2 {
-                    x: sprite_hw,
-                    y: sprite_hw,
-                }),
-                rotation: -self.direction_angle - PI / 2.0,
-                source: Some(self.walk_animation.get_frame()),
-                flip_x: false,
-                flip_y: false,
-                pivot: None,
-            },
-        );
-        draw_texture_ex(
-            self.attack_animation.get_texture(),
-            self.position.x - outer_radius,
-            field.height - (self.position.y + outer_radius),
-            WHITE,
-            DrawTextureParams {
-                dest_size: Some(Vec2 {
-                    x: sprite_hw,
-                    y: sprite_hw,
-                }),
-                rotation: -self.direction_angle - PI / 2.0,
-                source: Some(self.attack_animation.get_frame()),
-                flip_x: false,
-                flip_y: false,
-                pivot: None,
-            },
-        );
-
-        draw_circle(
-            self.position.x,
-            field.height - self.position.y,
-            self.radius,
-            Color::new(0.0, 0.0, 0.0, 0.3),
-        );
-
-        let e_direction = self.radius * self.get_direction_vec() + self.position;
-
-        draw_line(
-            self.position.x,
-            field.height - self.position.y,
-            e_direction.x,
-            field.height - e_direction.y,
-            4.0,
-            BLACK,
-        );
-
-        let e_attack = self.get_attack_vec();
-        let mut weapon_color = RED;
-        if self.weapon.is_attacking() {
-            weapon_color = ORANGE;
-        }
-        if self.weapon.is_damaging() {
-            weapon_color = BLACK;
-        }
-        draw_circle(e_attack.x, field.height - e_attack.y, 5.0, weapon_color)
     }
 }
 
@@ -175,7 +125,7 @@ async fn load_textures() -> TexturePack {
 fn make_gladiator(texture_pack: &TexturePack) -> Entity {
     let mut attack_vec = vec![];
     for i in 0..15 {
-        attack_vec.push((Rect::new(256.0 * (i as f32), 0.0, 256.0, 256.0), 15));
+        attack_vec.push((Rect::new(256.0 * (i as f32), 0.0, 256.0, 256.0), 100));
     }
 
     let mut walk_vec = vec![];

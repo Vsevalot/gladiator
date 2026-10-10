@@ -1,10 +1,10 @@
-use std::{collections::VecDeque, rc::Rc};
+use std::{collections::VecDeque, f32::consts::PI, rc::Rc};
 
-use crate::animation::Animation;
+use crate::{animation::Animation, Field};
 use macroquad::prelude::*;
 
 type ID = u32;
-const RADIUS: f32 = 100.0;
+const RADIUS: f32 = 50.0;
 
 #[derive(Debug, Clone)]
 pub struct Entity {
@@ -138,6 +138,77 @@ impl Entity {
         );
         self.speed *= 0.3; // slowing down?...
     }
+
+    pub fn draw_status(&self, field: &Field) {
+        // HP
+        draw_rectangle(
+            self.position.x - self.radius * 0.5,
+            field.height - self.position.y - self.radius - 15.0,
+            self.radius,
+            10.0,
+            RED,
+        );
+        draw_rectangle(
+            self.position.x - self.radius * 0.5,
+            field.height - self.position.y - self.radius - 15.0,
+            self.radius * (self.hp / self.max_hp),
+            10.0,
+            GREEN,
+        );
+
+        let e_direction = self.radius * self.get_direction_vec() + self.position;
+        draw_line(
+            self.position.x,
+            field.height - self.position.y,
+            e_direction.x,
+            field.height - e_direction.y,
+            4.0,
+            BLACK,
+        );
+
+        let e_attack = self.get_attack_vec();
+        let mut weapon_color = RED;
+        if self.weapon.is_attacking() {
+            weapon_color = ORANGE;
+        }
+        if self.weapon.is_damaging() {
+            weapon_color = BLACK;
+        }
+        draw_circle(e_attack.x, field.height - e_attack.y, 5.0, weapon_color)
+    }
+
+    pub fn draw_steps(&self, field: &Field) {
+        for step in self.footstep_tracker.footsteps.iter() {
+            draw_texture_ex(
+                &step.texture,
+                step.position.x - self.radius, // - (10.0 * (-1 as i32).pow(step.should_mirror as u32) as f32),
+                field.height - (step.position.y + self.radius),
+                Color {
+                    r: (1.0),
+                    g: (1.0),
+                    b: (1.0),
+                    a: (step.opacity),
+                },
+                DrawTextureParams {
+                    dest_size: None,
+                    rotation: -step.direction_angle + PI / 2.0,
+                    source: None,
+                    flip_x: step.should_mirror,
+                    flip_y: false,
+                    pivot: None,
+                },
+            );
+        }
+    }
+
+    pub fn draw_hitbox(&self, field: &Field) {
+        draw_circle(
+            self.position.x,
+            field.height - self.position.y,
+            self.radius,
+            Color::new(0.0, 0.0, 0.0, 0.3),
+        );
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -155,10 +226,10 @@ pub struct Weapon {
 
 impl Weapon {
     pub const SPEAR: Self = Self {
-        cooldown_ticks: 50,
+        cooldown_ticks: 100 * 15,
         current_tick: 0,
-        damage_tick_start: 10,
-        damage_tick_end: 20,
+        damage_tick_start: 100 * 8,
+        damage_tick_end: 100 * 12,
         damage: 10.0,
         stamina_cost: 10.0,
         range: 65.0,
@@ -221,6 +292,7 @@ pub struct Footstep {
     pub position: Vec2,
     pub direction_angle: f32,
     pub should_mirror: bool,
+    pub opacity: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -262,11 +334,15 @@ impl FootstepTracker {
                 direction_angle: self.current_direction_angle,
                 position: self.current_position,
                 should_mirror: should_mirror,
+                opacity: 1.0,
             });
 
             if self.footsteps.len() > 20 {
                 // my magic max number of steps
                 self.footsteps.pop_front();
+            }
+            for step in self.footsteps.iter_mut() {
+                step.opacity -= 0.05
             }
             self.distance_since_last = 0.0;
         }

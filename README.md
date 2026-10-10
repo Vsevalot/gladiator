@@ -11,12 +11,13 @@ simulation:
 + spear offset
 + zombie rotation speed
 + make tick process all
++ spear animation
 - score
 + interface (stamina, HP, cd)
+- make steps dissapear after a time (not after a number of steps)
 - use rust enums to present weapon state
 - make zombies attack from farrer distance than hit
 - blood and corpses =)
-- spear animation
 - sector tracing -> for model input
 
 
