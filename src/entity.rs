@@ -181,8 +181,8 @@ impl Entity {
         for step in self.footstep_tracker.footsteps.iter() {
             draw_texture_ex(
                 &step.texture,
-                step.position.x - self.radius, // - (10.0 * (-1 as i32).pow(step.should_mirror as u32) as f32),
-                field.height - (step.position.y + self.radius),
+                step.position.x - step.texture.width()/2.0,
+                field.height - (step.position.y + step.texture.height()/2.0),
                 Color {
                     r: (1.0),
                     g: (1.0),
@@ -326,7 +326,7 @@ impl FootstepTracker {
             distance_since_last: 0.0,
             current_direction_angle: 0.0,
             current_position: Vec2::ZERO,
-            distance_per_step: 20.0,
+            distance_per_step: 30.0,
             footsteps: VecDeque::new(),
             texture: texture,
             footstep_lifetime: 300,
@@ -348,7 +348,7 @@ impl FootstepTracker {
             self.footsteps.push_back(Footstep {
                 texture: Rc::clone(&self.texture),
                 direction_angle: self.current_direction_angle,
-                position: self.current_position,
+                position: self.current_position + Vec2{x: rand::gen_range(-5.0, 5.0), y: rand::gen_range(-5.0, 5.0)},
                 should_mirror: should_mirror,
                 created_at_tick: global_tick,
             });
