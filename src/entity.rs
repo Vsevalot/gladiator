@@ -1,6 +1,8 @@
-use std::{collections::VecDeque, f32::consts::PI, rc::Rc};
+use std::{collections::VecDeque, error::Error, f32::consts::PI, rc::Rc};
 
-use crate::{animation::Animation, Field};
+use crate::{
+    animation::Animation, serialization::MyDeserialize, serialization::MySerialize, Field,
+};
 use macroquad::prelude::*;
 
 type ID = u32;
@@ -16,18 +18,18 @@ pub struct Entity {
     pub radius: f32,
     pub direction_angle: f32,
 
-    pub walk_animation: Animation,
-    pub attack_animation: Animation,
-
     pub max_hp: f32,
     pub hp: f32,
 
     pub weapon: Weapon,
-    pub footstep_tracker: FootstepTracker,
 
     pub max_stamina: f32,
     pub stamina: f32,
     pub stamina_recovery_per_tick: f32,
+
+    pub walk_animation: Animation,
+    pub attack_animation: Animation,
+    pub footstep_tracker: FootstepTracker,
 }
 
 impl Entity {
@@ -181,8 +183,8 @@ impl Entity {
         for step in self.footstep_tracker.footsteps.iter() {
             draw_texture_ex(
                 &step.texture,
-                step.position.x - step.texture.width()/2.0,
-                field.height - (step.position.y + step.texture.height()/2.0),
+                step.position.x - step.texture.width() / 2.0,
+                field.height - (step.position.y + step.texture.height() / 2.0),
                 Color {
                     r: (1.0),
                     g: (1.0),
@@ -225,6 +227,81 @@ pub struct Weapon {
     range: f32,
     damaged_this_cycle: Vec<ID>,
     offset: f32,
+}
+
+impl MySerialize for WeaponState {
+    fn serialize(&self, buffer: &mut Vec<u8>) {
+        let (state, attacking_value) = match self {
+            WeaponState::Idle => (0, 0),
+            WeaponState::Attacking(v) => (1, *v),
+        };
+        state.serialize(buffer);
+        attacking_value.serialize(buffer);
+    }
+}
+impl MyDeserialize for WeaponState {
+    fn deserialize(buffer: &[u8], cursor: &mut usize) -> Result<Self, String> {
+        let state = u32::deserialize(buffer, cursor)?;
+        let attacking_value = u32::deserialize(buffer, cursor)?;
+        match state {
+            0 => Ok(WeaponState::Idle),
+            1 => Ok(WeaponState::Attacking(attacking_value)),
+            _ => Err("Unknown state".to_string()),
+        }
+    }
+}
+
+impl MySerialize for Vec<ID> {
+    fn serialize(&self, buffer: &mut Vec<u8>) {
+        (self.len() as u32).serialize(buffer);
+        for i in self.iter() {
+            i.serialize(buffer);
+        }
+    }
+}
+impl MyDeserialize for Vec<ID> {
+    fn deserialize(buffer: &[u8], cursor: &mut usize) -> Result<Self, String> {
+        let length = u32::deserialize(buffer, cursor)?;
+        let mut v = Vec::with_capacity(length as usize);
+        for i in 0..length {
+            v[i as usize] = u32::deserialize(buffer, cursor)?;
+        }
+        Ok(v)
+    }
+}
+impl MySerialize for Weapon {
+    fn serialize(&self, buffer: &mut Vec<u8>) {
+        self.state.serialize(buffer);
+
+        // u32
+        self.cooldown_ticks.serialize(buffer);
+        self.damage_tick_start.serialize(buffer);
+        self.damage_tick_end.serialize(buffer);
+
+        // f32
+        self.damage.serialize(buffer);
+        self.stamina_cost.serialize(buffer);
+        self.range.serialize(buffer);
+        self.offset.serialize(buffer);
+
+        // Vec<ID>
+        self.damaged_this_cycle.serialize(buffer);
+    }
+}
+impl MyDeserialize for Weapon {
+    fn deserialize(buffer: &[u8], cursor: &mut usize) -> Result<Self, String> {
+        Ok(Weapon {
+            state: WeaponState::deserialize(buffer, cursor)?,
+            cooldown_ticks: u32::deserialize(buffer, cursor)?,
+            damage_tick_start: u32::deserialize(buffer, cursor)?,
+            damage_tick_end: u32::deserialize(buffer, cursor)?,
+            damage: f32::deserialize(buffer, cursor)?,
+            stamina_cost: f32::deserialize(buffer, cursor)?,
+            range: f32::deserialize(buffer, cursor)?,
+            offset: f32::deserialize(buffer, cursor)?,
+            damaged_this_cycle: Vec::<ID>::deserialize(buffer, cursor)?,
+        })
+    }
 }
 
 pub const TICKS_PER_FRAME: u32 = 4;
@@ -348,7 +425,11 @@ impl FootstepTracker {
             self.footsteps.push_back(Footstep {
                 texture: Rc::clone(&self.texture),
                 direction_angle: self.current_direction_angle,
-                position: self.current_position + Vec2{x: rand::gen_range(-5.0, 5.0), y: rand::gen_range(-5.0, 5.0)},
+                position: self.current_position
+                    + Vec2 {
+                        x: rand::gen_range(-5.0, 5.0),
+                        y: rand::gen_range(-5.0, 5.0),
+                    },
                 should_mirror: should_mirror,
                 created_at_tick: global_tick,
             });

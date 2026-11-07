@@ -1,6 +1,7 @@
 mod animation;
 mod engine;
 mod entity;
+mod serialization;
 
 use animation::Animation;
 use engine::Engine;
@@ -135,7 +136,7 @@ fn make_gladiator(texture_pack: &TexturePack) -> Entity {
     for i in 0..8 {
         walk_vec.push((
             Rect::new(256.0 * (i as f32), 0.0, 256.0, 256.0),
-            TICKS_PER_FRAME*2,
+            TICKS_PER_FRAME * 2,
         ));
     }
     return Entity::make_gladiator(
