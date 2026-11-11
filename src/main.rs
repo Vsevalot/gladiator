@@ -84,6 +84,7 @@ fn draw_interface(hp: f32, stamina: f32) {
     draw_rectangle(10.0, 10.0, 300.0, 100.0, GRAY);
     draw_text(format!("HP: {}", hp), 20.0, 30.0, 20.0, BLACK);
     draw_text(format!("Stamina: {}", stamina), 20.0, 60.0, 20.0, BLACK);
+    draw_text(format!("Frame time: {}ms", get_frame_time()*1000.0), 20.0, 90.0, 20.0, BLACK);
 }
 
 fn draw_all(engine: &Engine) {
@@ -206,10 +207,10 @@ async fn main() {
             engine.gladiator.speed.x += 1.0;
         }
         if is_key_down(KeyCode::Left) {
-            engine.gladiator.direction_angle -= (0.1) / std::f32::consts::PI;
+            engine.gladiator.direction_angle += (0.1) / std::f32::consts::PI;
         }
         if is_key_down(KeyCode::Right) {
-            engine.gladiator.direction_angle += (0.1) / std::f32::consts::PI;
+            engine.gladiator.direction_angle -= (0.1) / std::f32::consts::PI;
         }
         if is_key_down(KeyCode::Space) {
             engine.attack_by_gladiator()
