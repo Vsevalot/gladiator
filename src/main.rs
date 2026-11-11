@@ -10,6 +10,8 @@ use macroquad::prelude::*;
 
 use std::{f32::consts::PI, rc::Rc};
 
+const SEC_PER_UPDATE: f64 = 0.01;
+
 #[derive(Debug, Clone)]
 struct TexturePack {
     gladiator_attack: Rc<Texture2D>,
@@ -83,8 +85,8 @@ impl Drawable for Entity {
 fn draw_interface(hp: f32, stamina: f32) {
     draw_rectangle(10.0, 10.0, 300.0, 100.0, GRAY);
     draw_text(format!("HP: {}", hp), 20.0, 30.0, 20.0, BLACK);
-    draw_text(format!("Stamina: {}", stamina), 20.0, 60.0, 20.0, BLACK);
-    draw_text(format!("Frame time: {}ms", get_frame_time()*1000.0), 20.0, 90.0, 20.0, BLACK);
+    draw_text(format!("Stamina: {}", stamina), 20.0, 45.0, 20.0, BLACK);
+    draw_text(format!("FPS: {}", get_fps()), 20.0, 60.0, 20.0, BLACK);
 }
 
 fn draw_all(engine: &Engine) {
@@ -193,7 +195,15 @@ async fn main() {
         field.clone(),
     );
 
+    let mut previous = macroquad::time::get_time();
+    let mut lag = 0.0;
+
     loop {
+        let current = macroquad::time::get_time();
+        let elapsed = current - previous;
+        previous = current;
+        lag += elapsed;
+
         if is_key_down(KeyCode::W) {
             engine.gladiator.speed.y += 1.0;
         }
@@ -226,18 +236,21 @@ async fn main() {
             return;
         }
 
-        draw_all(&engine);
+        while lag >= SEC_PER_UPDATE {
+            engine.tick();
 
-        engine.tick();
-
-        for entity in engine.get_entities().iter_mut() {
-            if entity.speed.length() > 0.1 {
-                entity.walk_animation.tick();
+            for entity in engine.get_entities().iter_mut() {
+                if entity.speed.length() > 0.1 {
+                    entity.walk_animation.tick();
+                }
+                if entity.is_attacking() {
+                    entity.attack_animation.tick();
+                }
             }
-            if entity.is_attacking() {
-                entity.attack_animation.tick();
-            }
+            lag -= SEC_PER_UPDATE;
         }
+
+        draw_all(&engine);
 
         next_frame().await
     }
