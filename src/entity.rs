@@ -32,6 +32,58 @@ pub struct Entity {
     pub footstep_tracker: FootstepTracker,
 }
 
+impl MySerialize for Entity {
+    fn serialize(&self, buffer: &mut Vec<u8>) {
+        self.id.serialize(buffer);
+
+        self.position.serialize(buffer);
+        self.speed.serialize(buffer);
+        self.mass.serialize(buffer);
+        self.radius.serialize(buffer);
+        self.direction_angle.serialize(buffer);
+
+        self.max_hp.serialize(buffer);
+        self.hp.serialize(buffer);
+
+        self.weapon.serialize(buffer);
+
+        self.max_stamina.serialize(buffer);
+        self.stamina.serialize(buffer);
+        self.stamina_recovery_per_tick.serialize(buffer);
+
+        self.walk_animation.serialize(buffer);
+        self.attack_animation.serialize(buffer);
+        self.footstep_tracker.serialize(buffer);
+    }
+}
+impl MyDeserialize for Entity {
+    fn deserialize(buffer: &[u8], cursor: &mut usize) -> Result<Self, String> {
+        Ok(Entity {
+            id: u32::deserialize(buffer, cursor)?,
+
+            position: Vec2::deserialize(buffer, cursor)?,
+            speed: Vec2::deserialize(buffer, cursor)?,
+            mass: f32::deserialize(buffer, cursor)?,
+            radius: f32::deserialize(buffer, cursor)?,
+            direction_angle: f32::deserialize(buffer, cursor)?,
+
+            max_hp: f32::deserialize(buffer, cursor)?,
+            hp: f32::deserialize(buffer, cursor)?,
+
+            weapon: Weapon::deserialize(buffer, cursor)?,
+
+            max_stamina: f32::deserialize(buffer, cursor)?,
+            stamina: f32::deserialize(buffer, cursor)?,
+            stamina_recovery_per_tick: f32::deserialize(buffer, cursor)?,
+
+            walk_animation: Animation::deserialize(buffer, cursor)?,
+            attack_animation: Animation::deserialize(buffer, cursor)?,
+
+            footstep_tracker: FootstepTracker::deserialize(buffer, cursor)?,
+        })
+    }
+}
+
 impl Entity {
     pub fn tick(&mut self, global_tick: u32) {
         self.weapon.tick(global_tick);

@@ -1,4 +1,5 @@
 use crate::entity::Entity;
+use crate::serialization::MySerialize;
 use crate::Field;
 
 use macroquad::prelude::*;
@@ -179,6 +180,16 @@ impl Engine {
         return std::iter::once(&mut self.gladiator)
             .chain(self.zombies.iter_mut())
             .collect::<Vec<&mut Entity>>();
+    }
+}
+
+impl MySerialize for Engine {
+    fn serialize(&self, buffer: &mut Vec<u8>) {
+        self.gladiator.serialize(buffer);
+        self.zombies.serialize(buffer);
+        self.field.serialize(buffer);
+        self.game_ended.serialize(buffer);
+        self.global_tick.serialize(buffer);
     }
 }
 

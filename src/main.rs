@@ -10,6 +10,8 @@ use macroquad::prelude::*;
 
 use std::{f32::consts::PI, rc::Rc};
 
+use crate::serialization::{MyDeserialize, MySerialize};
+
 #[derive(Debug, Clone)]
 struct TexturePack {
     gladiator_attack: Rc<Texture2D>,
@@ -22,6 +24,22 @@ struct TexturePack {
 struct Field {
     width: f32,
     height: f32,
+}
+
+impl MySerialize for Field {
+    fn serialize(&self, buffer: &mut Vec<u8>) {
+        self.width.serialize(buffer);
+        self.height.serialize(buffer);
+    }
+}
+
+impl MyDeserialize for Field {
+    fn deserialize(buffer: &[u8], cursor: &mut usize) -> Result<Self, String> {
+        Ok(Field {
+            width: f32::deserialize(buffer, cursor)?,
+            height: f32::deserialize(buffer, cursor)?,
+        })
+    }
 }
 
 trait Drawable {
@@ -84,7 +102,13 @@ fn draw_interface(hp: f32, stamina: f32) {
     draw_rectangle(10.0, 10.0, 300.0, 100.0, GRAY);
     draw_text(format!("HP: {}", hp), 20.0, 30.0, 20.0, BLACK);
     draw_text(format!("Stamina: {}", stamina), 20.0, 60.0, 20.0, BLACK);
-    draw_text(format!("Frame time: {}ms", get_frame_time()*1000.0), 20.0, 90.0, 20.0, BLACK);
+    draw_text(
+        format!("Frame time: {}ms", get_frame_time() * 1000.0),
+        20.0,
+        90.0,
+        20.0,
+        BLACK,
+    );
 }
 
 fn draw_all(engine: &Engine) {
