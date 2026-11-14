@@ -17,7 +17,8 @@ struct TexturePack {
     gladiator_attack: Rc<Texture2D>,
     gladiator_walk: Rc<Texture2D>,
     gladiator_step: Rc<Texture2D>,
-    zombie: Rc<Texture2D>,
+
+    zombie_walk: Rc<Texture2D>,
 }
 
 #[derive(Debug, Clone)]
@@ -116,13 +117,18 @@ async fn load_textures() -> TexturePack {
             .await
             .unwrap(),
     );
-    let zombie_texture = Rc::new(load_texture("assets/textures/ai/zombie.png").await.unwrap());
+    let zombie_walk_texture = Rc::new(
+        load_texture("assets/textures/real/zombie_walking.png")
+            .await
+            .unwrap(),
+    );
 
     return TexturePack {
         gladiator_walk: gladiator_walk_texture,
         gladiator_attack: gladiator_attack_texture,
         gladiator_step: gladiator_step_texture,
-        zombie: zombie_texture,
+
+        zombie_walk: zombie_walk_texture,
     };
 }
 
@@ -151,33 +157,34 @@ fn make_gladiator(texture_pack: &TexturePack) -> Entity {
 }
 
 fn make_zombies(texture_pack: &TexturePack) -> Vec<Entity> {
-    return vec![];
-    // return vec![
-    //     Entity::make_zombie(
-    //         2,
-    //         Vec2 { x: 200.0, y: 100.0 },
-    //         Animation::new(
-    //             Rc::clone(&texture_pack.zombie),
-    //             vec![(Rect::new(0.0, 0.0, 997.0, 997.0), 15)],
-    //         ),
-    //     ),
-    //     Entity::make_zombie(
-    //         3,
-    //         Vec2 { x: 350.0, y: 150.0 },
-    //         Animation::new(
-    //             Rc::clone(&texture_pack.zombie),
-    //             vec![(Rect::new(0.0, 0.0, 997.0, 997.0), 15)],
-    //         ),
-    //     ),
-    //     Entity::make_zombie(
-    //         4,
-    //         Vec2 { x: 500.0, y: 300.0 },
-    //         Animation::new(
-    //             Rc::clone(&texture_pack.zombie),
-    //             vec![(Rect::new(0.0, 0.0, 997.0, 997.0), 15)],
-    //         ),
-    //     ),
-    // ];
+    let anim = Animation::new(
+        Rc::clone(&texture_pack.zombie_walk),
+        vec![(Rect::new(0.0, 0.0, 256.0, 256.0), TICKS_PER_FRAME)],
+    );
+
+    return vec![
+        Entity::make_zombie(
+            2,
+            Vec2 { x: 200.0, y: 100.0 },
+            anim.clone(),
+            anim.clone(),
+            Rc::clone(&texture_pack.gladiator_step),
+        ),
+        Entity::make_zombie(
+            3,
+            Vec2 { x: 350.0, y: 150.0 },
+            anim.clone(),
+            anim.clone(),
+            Rc::clone(&texture_pack.gladiator_step),
+        ),
+        Entity::make_zombie(
+            4,
+            Vec2 { x: 500.0, y: 300.0 },
+            anim.clone(),
+            anim.clone(),
+            Rc::clone(&texture_pack.gladiator_step),
+        ),
+    ];
 }
 
 fn collect_inputs() -> Vec<InputEvent> {
