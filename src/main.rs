@@ -157,9 +157,16 @@ fn make_gladiator(texture_pack: &TexturePack) -> Entity {
 }
 
 fn make_zombies(texture_pack: &TexturePack) -> Vec<Entity> {
+    let mut walk_vec = vec![];
+    for i in 0..8 {
+        walk_vec.push((
+            Rect::new(256.0 * (i as f32), 0.0, 256.0, 256.0),
+            TICKS_PER_FRAME * 2,
+        ));
+    }
     let anim = Animation::new(
         Rc::clone(&texture_pack.zombie_walk),
-        vec![(Rect::new(0.0, 0.0, 256.0, 256.0), TICKS_PER_FRAME)],
+        walk_vec,
     );
 
     return vec![
