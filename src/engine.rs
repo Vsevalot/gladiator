@@ -6,6 +6,16 @@ use macroquad::prelude::*;
 const MAX_ROTATION_SPEED: f32 = 0.01;
 const MIN_ROTATION_SPEED: f32 = 0.001;
 
+pub enum InputEvent {
+    MoveUp,
+    MoveDown,
+    MoveLeft,
+    MoveRight,
+    RotateLeft,
+    RotateRight,
+    Attack,
+}
+
 #[derive(Debug)]
 pub struct Engine {
     pub gladiator: Entity,
@@ -45,7 +55,23 @@ impl Engine {
         };
         return engine;
     }
-
+    pub fn process_inputs(&mut self, inputs: Vec<InputEvent>) {
+        for inp in inputs.iter() {
+            match inp {
+                InputEvent::MoveUp => self.gladiator.speed.y += 1.0,
+                InputEvent::MoveDown => self.gladiator.speed.y -= 1.0,
+                InputEvent::MoveLeft => self.gladiator.speed.x -= 1.0,
+                InputEvent::MoveRight => self.gladiator.speed.x += 1.0,
+                InputEvent::RotateLeft => {
+                    self.gladiator.direction_angle += (0.1) / std::f32::consts::PI
+                }
+                InputEvent::RotateRight => {
+                    self.gladiator.direction_angle -= (0.1) / std::f32::consts::PI
+                }
+                InputEvent::Attack => self.attack_by_gladiator(),
+            }
+        }
+    }
     pub fn attack_by_gladiator(&mut self) {
         self.gladiator.attack();
     }

@@ -4,7 +4,7 @@ mod entity;
 mod serialization;
 
 use animation::Animation;
-use engine::Engine;
+use engine::{Engine, InputEvent};
 use entity::{Entity, TICKS_PER_FRAME};
 use macroquad::prelude::*;
 
@@ -180,6 +180,32 @@ fn make_zombies(texture_pack: &TexturePack) -> Vec<Entity> {
     // ];
 }
 
+fn collect_inputs() -> Vec<InputEvent> {
+    let mut inputs = vec![];
+    if is_key_down(KeyCode::W) {
+        inputs.push(InputEvent::MoveUp);
+    }
+    if is_key_down(KeyCode::S) {
+        inputs.push(InputEvent::MoveDown);
+    }
+    if is_key_down(KeyCode::A) {
+        inputs.push(InputEvent::MoveLeft);
+    }
+    if is_key_down(KeyCode::D) {
+        inputs.push(InputEvent::MoveRight);
+    }
+    if is_key_down(KeyCode::Left) {
+        inputs.push(InputEvent::RotateLeft);
+    }
+    if is_key_down(KeyCode::Right) {
+        inputs.push(InputEvent::RotateRight);
+    }
+    if is_key_pressed(KeyCode::Space) {
+        inputs.push(InputEvent::Attack);
+    }
+    return inputs;
+}
+
 #[macroquad::main("Gladiator")]
 async fn main() {
     let field = Field {
@@ -204,27 +230,6 @@ async fn main() {
         previous = current;
         lag += elapsed;
 
-        if is_key_down(KeyCode::W) {
-            engine.gladiator.speed.y += 1.0;
-        }
-        if is_key_down(KeyCode::S) {
-            engine.gladiator.speed.y -= 1.0;
-        }
-        if is_key_down(KeyCode::A) {
-            engine.gladiator.speed.x -= 1.0;
-        }
-        if is_key_down(KeyCode::D) {
-            engine.gladiator.speed.x += 1.0;
-        }
-        if is_key_down(KeyCode::Left) {
-            engine.gladiator.direction_angle += (0.1) / std::f32::consts::PI;
-        }
-        if is_key_down(KeyCode::Right) {
-            engine.gladiator.direction_angle -= (0.1) / std::f32::consts::PI;
-        }
-        if is_key_down(KeyCode::Space) {
-            engine.attack_by_gladiator()
-        }
         if is_key_down(KeyCode::R) {
             engine = Engine::new(
                 make_gladiator(&texture_pack),
@@ -235,6 +240,9 @@ async fn main() {
         if is_key_down(KeyCode::Q) {
             return;
         }
+
+        let inputs = collect_inputs();
+        engine.process_inputs(inputs);
 
         while lag >= SEC_PER_UPDATE {
             engine.tick();
