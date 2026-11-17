@@ -1,5 +1,5 @@
 use crate::entity::Entity;
-use crate::serialization::MySerialize;
+use crate::serialization::{MyDeserialize, MySerialize};
 use crate::Field;
 
 use macroquad::prelude::*;
@@ -230,6 +230,17 @@ impl MySerialize for Engine {
     }
 }
 
+impl MyDeserialize for Engine {
+    fn deserialize(buffer: &[u8], cursor: &mut usize) -> Result<Self, String> {
+        Ok(Engine {
+            gladiator: Entity::deserialize(buffer, cursor)?,
+            zombies: Vec::<Entity>::deserialize(buffer, cursor)?,
+            field: Field::deserialize(buffer, cursor)?,
+            game_ended: bool::deserialize(buffer, cursor)?,
+            global_tick: u32::deserialize(buffer, cursor)?,
+        })
+    }
+}
 fn get_pushed_out_speeds(entity1: &Entity, entity2: &Entity) -> (Vec2, Vec2) {
     let center_to_center_vector = entity1.position - entity2.position;
     let min_not_pushable_distance = entity1.radius + entity2.radius;

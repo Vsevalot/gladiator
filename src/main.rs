@@ -3,6 +3,9 @@ mod engine;
 mod entity;
 mod serialization;
 
+use std::fs::{read, File};
+use std::io::{BufWriter, Write};
+
 use animation::Animation;
 use engine::{Engine, InputEvent};
 use entity::{Entity, TICKS_PER_FRAME};
@@ -275,6 +278,99 @@ fn collect_inputs() -> Vec<InputEvent> {
     }
     return inputs;
 }
+//
+// #[macroquad::main("Gladiator")]
+// async fn main() {
+//     let field = Field {
+//         width: screen_width(),
+//         height: screen_height(),
+//     };
+//
+//     let annimation_pack = load_attack_animations().await;
+//
+//     let mut engine = Engine::new(
+//         Entity::make_gladiator(Vec2 { x: 50.0, y: 50.0 }),
+//         make_zombies(),
+//         field.clone(),
+//     );
+//     let mut attack_animations = HashMap::<u32, Animation>::new();
+//     attack_animations.insert(
+//         engine.gladiator.id,
+//         Animation::new(annimation_pack.gladiator_attack),
+//     );
+//     let mut walk_animations = HashMap::<u32, Animation>::new();
+//     walk_animations.insert(
+//         engine.gladiator.id,
+//         Animation::new(annimation_pack.gladiator_walk),
+//     );
+//     let mut footstep_trackers = HashMap::<u32, FootstepTracker>::new();
+//     footstep_trackers.insert(
+//         engine.gladiator.id,
+//         FootstepTracker::new(annimation_pack.gladiator_step_texture.clone()),
+//     );
+//
+//     for id in 2..5 {
+//         // TODO: introduce entity type to map on it
+//         attack_animations.insert(id, Animation::new(annimation_pack.zombie.clone()));
+//         walk_animations.insert(id, Animation::new(annimation_pack.zombie.clone()));
+//         footstep_trackers.insert(
+//             id,
+//             FootstepTracker::new(annimation_pack.gladiator_step_texture.clone()),
+//         );
+//     }
+//
+//     let mut entities_positions = HashMap::<u32, Vec2>::new();
+//     for entity in engine.get_entities() {
+//         entities_positions.insert(entity.id, entity.position);
+//     }
+//
+//     let mut previous = macroquad::time::get_time();
+//     let mut lag = 0.0;
+//
+//     let replay: Vec<u8> = read("replay.bin").unwrap();
+//     let mut cursor: usize = 0;
+//
+//     loop {
+//         let current = macroquad::time::get_time();
+//         let elapsed = current - previous;
+//         previous = current;
+//         lag += elapsed;
+//
+//         if is_key_down(KeyCode::Q) {
+//             break;
+//         }
+//
+//         while lag >= SEC_PER_UPDATE {
+//             engine = Engine::deserialize(&replay, &mut cursor).unwrap();
+//
+//             lag -= SEC_PER_UPDATE;
+//         }
+//         if engine.game_ended {
+//             break;
+//         }
+//
+//         // Drawing
+//         draw_all(
+//             &engine,
+//             &mut attack_animations,
+//             &mut walk_animations,
+//             &mut footstep_trackers,
+//         );
+//         for (id, previous_position) in entities_positions.iter_mut() {
+//             let footstep_tracker = footstep_trackers.get_mut(id).unwrap(); // TODO: unite
+//                                                                            // footstep_tracker and previous_position?
+//             let entity = engine.get_entity(*id);
+//
+//             if let Some(ref e) = entity {
+//                 let distance_travelled = (e.position - *previous_position).length();
+//                 footstep_tracker.add_movement(distance_travelled, e.position, e.direction_angle);
+//                 *previous_position = e.position;
+//             }
+//         }
+//
+//         next_frame().await
+//     }
+// }
 
 #[macroquad::main("Gladiator")]
 async fn main() {
@@ -324,6 +420,10 @@ async fn main() {
     let mut previous = macroquad::time::get_time();
     let mut lag = 0.0;
 
+    let file = File::create("replay.bin").unwrap();
+    let mut writer = BufWriter::new(file);
+    let mut replay = Vec::<u8>::new();
+
     loop {
         let current = macroquad::time::get_time();
         let elapsed = current - previous;
@@ -338,7 +438,7 @@ async fn main() {
             );
         }
         if is_key_down(KeyCode::Q) {
-            return;
+            break;
         }
 
         let inputs = collect_inputs();
@@ -346,10 +446,12 @@ async fn main() {
 
         while lag >= SEC_PER_UPDATE {
             engine.tick();
+            engine.serialize(&mut replay);
 
             lag -= SEC_PER_UPDATE;
         }
 
+        // Drawing
         draw_all(
             &engine,
             &mut attack_animations,
@@ -370,4 +472,7 @@ async fn main() {
 
         next_frame().await
     }
+
+    writer.write_all(&replay).unwrap();
+    writer.flush().unwrap();
 }
