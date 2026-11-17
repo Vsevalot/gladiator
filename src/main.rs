@@ -4,11 +4,12 @@ mod entity;
 mod serialization;
 
 use animation::Animation;
-use engine::Engine;
+use engine::{Engine, InputEvent};
 use entity::{Entity, TICKS_PER_FRAME};
 use macroquad::prelude::*;
 
 pub const SPEED_TO_ANIMATE_WALK: f32 = 0.3;
+const SEC_PER_UPDATE: f64 = 0.01;
 
 use std::{collections::HashMap, f32::consts::PI, rc::Rc};
 
@@ -50,7 +51,7 @@ impl MyDeserialize for Field {
 fn draw_interface(hp: f32, stamina: f32) {
     draw_rectangle(10.0, 10.0, 300.0, 100.0, GRAY);
     draw_text(format!("HP: {}", hp), 20.0, 30.0, 20.0, BLACK);
-    draw_text(format!("Stamina: {}", stamina), 20.0, 60.0, 20.0, BLACK);
+    draw_text(format!("Stamina: {}", stamina), 20.0, 45.0, 20.0, BLACK);
     draw_text(
         format!("Frame time: {}ms", get_frame_time() * 1000.0),
         20.0,
@@ -58,6 +59,7 @@ fn draw_interface(hp: f32, stamina: f32) {
         20.0,
         BLACK,
     );
+    draw_text(format!("FPS: {}", get_fps()), 20.0, 60.0, 20.0, BLACK);
 }
 
 fn draw_all(
@@ -243,33 +245,37 @@ async fn load_attack_animations() -> AnimationPack {
 }
 
 fn make_zombies() -> Vec<Entity> {
-    return vec![];
-    // return vec![
-    //     Entity::make_zombie(
-    //         2,
-    //         Vec2 { x: 200.0, y: 100.0 },
-    //         Animation::new(
-    //             Rc::clone(&texture_pack.zombie),
-    //             vec![(Rect::new(0.0, 0.0, 997.0, 997.0), 15)],
-    //         ),
-    //     ),
-    //     Entity::make_zombie(
-    //         3,
-    //         Vec2 { x: 350.0, y: 150.0 },
-    //         Animation::new(
-    //             Rc::clone(&texture_pack.zombie),
-    //             vec![(Rect::new(0.0, 0.0, 997.0, 997.0), 15)],
-    //         ),
-    //     ),
-    //     Entity::make_zombie(
-    //         4,
-    //         Vec2 { x: 500.0, y: 300.0 },
-    //         Animation::new(
-    //             Rc::clone(&texture_pack.zombie),
-    //             vec![(Rect::new(0.0, 0.0, 997.0, 997.0), 15)],
-    //         ),
-    //     ),
-    // ];
+    return vec![
+        Entity::make_zombie(2, Vec2 { x: 200.0, y: 100.0 }),
+        Entity::make_zombie(3, Vec2 { x: 350.0, y: 150.0 }),
+        Entity::make_zombie(4, Vec2 { x: 500.0, y: 300.0 }),
+    ];
+}
+
+fn collect_inputs() -> Vec<InputEvent> {
+    let mut inputs = vec![];
+    if is_key_down(KeyCode::W) {
+        inputs.push(InputEvent::MoveUp);
+    }
+    if is_key_down(KeyCode::S) {
+        inputs.push(InputEvent::MoveDown);
+    }
+    if is_key_down(KeyCode::A) {
+        inputs.push(InputEvent::MoveLeft);
+    }
+    if is_key_down(KeyCode::D) {
+        inputs.push(InputEvent::MoveRight);
+    }
+    if is_key_down(KeyCode::Left) {
+        inputs.push(InputEvent::RotateLeft);
+    }
+    if is_key_down(KeyCode::Right) {
+        inputs.push(InputEvent::RotateRight);
+    }
+    if is_key_pressed(KeyCode::Space) {
+        inputs.push(InputEvent::Attack);
+    }
+    return inputs;
 }
 
 #[macroquad::main("Gladiator")]
@@ -291,42 +297,45 @@ async fn main() {
         engine.gladiator.id,
         Animation::new(annimation_pack.gladiator_attack),
     );
+    for id in range(2, 3, 4) {
+        attack_animations.insert(id, Animation::new(annimation_pack.zombie));
+    }
 
     let mut walk_animations = HashMap::<u32, Animation>::new();
     walk_animations.insert(
         engine.gladiator.id,
         Animation::new(annimation_pack.gladiator_walk),
     );
+    for id in range(2, 3, 4) {
+        walk_animations.insert(id, Animation::new(annimation_pack.zombie));
+    }
+
     let mut footstep_trackers = HashMap::<u32, FootstepTracker>::new();
     footstep_trackers.insert(
         engine.gladiator.id,
         FootstepTracker::new(annimation_pack.gladiator_step_texture),
     );
+    for id in range(2, 3, 4) {
+        footstep_trackers.insert(
+            id,
+            FootstepTracker::new(annimation_pack.gladiator_step_texture),
+        );
+    }
+
     let mut entities_positions = HashMap::<u32, Vec2>::new();
-    entities_positions.insert(engine.gladiator.id, engine.gladiator.position);
+    for entity in engine.get_entities() {
+        entities_positions.insert(entity.id, entity.position);
+    }
+
+    let mut previous = macroquad::time::get_time();
+    let mut lag = 0.0;
 
     loop {
-        if is_key_down(KeyCode::W) {
-            engine.gladiator.speed.y += 1.0;
-        }
-        if is_key_down(KeyCode::S) {
-            engine.gladiator.speed.y -= 1.0;
-        }
-        if is_key_down(KeyCode::A) {
-            engine.gladiator.speed.x -= 1.0;
-        }
-        if is_key_down(KeyCode::D) {
-            engine.gladiator.speed.x += 1.0;
-        }
-        if is_key_down(KeyCode::Left) {
-            engine.gladiator.direction_angle += (0.1) / std::f32::consts::PI;
-        }
-        if is_key_down(KeyCode::Right) {
-            engine.gladiator.direction_angle -= (0.1) / std::f32::consts::PI;
-        }
-        if is_key_down(KeyCode::Space) {
-            engine.attack_by_gladiator()
-        }
+        let current = macroquad::time::get_time();
+        let elapsed = current - previous;
+        previous = current;
+        lag += elapsed;
+
         if is_key_down(KeyCode::R) {
             engine = Engine::new(
                 Entity::make_gladiator(Vec2 { x: 50.0, y: 50.0 }),
@@ -338,31 +347,40 @@ async fn main() {
             return;
         }
 
-        engine.tick();
-        draw_all(
-            &engine,
-            &mut attack_animations,
-            &mut walk_animations,
-            &mut footstep_trackers,
-        );
-        for (id, previous_position) in entities_positions.iter_mut() {
-            let footstep_tracker = footstep_trackers.get_mut(id).unwrap(); // TODO: unite
-                                                                           // footstep_tracker and previous_position?
-            let entity = engine.get_entity(*id);
+        let inputs = collect_inputs();
+        engine.process_inputs(inputs);
 
-            match entity {
-                Some(e) => {
-                    let distance_travelled = (e.position - *previous_position).length();
-                    footstep_tracker.add_movement(
-                        distance_travelled,
-                        e.position,
-                        e.direction_angle,
-                    );
-                    *previous_position = e.position;
+        while lag >= SEC_PER_UPDATE {
+            engine.tick();
+
+            draw_all(
+                &engine,
+                &mut attack_animations,
+                &mut walk_animations,
+                &mut footstep_trackers,
+            );
+            for (id, previous_position) in entities_positions.iter_mut() {
+                let footstep_tracker = footstep_trackers.get_mut(id).unwrap(); // TODO: unite
+                                                                               // footstep_tracker and previous_position?
+                let entity = engine.get_entity(*id);
+
+                match entity {
+                    Some(e) => {
+                        let distance_travelled = (e.position - *previous_position).length();
+                        footstep_tracker.add_movement(
+                            distance_travelled,
+                            e.position,
+                            e.direction_angle,
+                        );
+                        *previous_position = e.position;
+                    }
+                    None => todo!(),
                 }
-                None => todo!(),
             }
+
+            lag -= SEC_PER_UPDATE;
         }
+
         next_frame().await
     }
 }
