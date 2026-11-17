@@ -54,6 +54,11 @@ impl MySerialize for u32 {
         buffer.extend_from_slice(&self.to_be_bytes());
     }
 }
+impl MySerialize for u8 {
+    fn serialize(&self, buffer: &mut Vec<u8>) {
+        buffer.extend_from_slice(&self.to_be_bytes());
+    }
+}
 impl MySerialize for String {
     fn serialize(&self, buffer: &mut Vec<u8>) {
         let bytes = self.clone().into_bytes(); // TODO: implement without clone
@@ -80,6 +85,16 @@ impl MyDeserialize for u32 {
         let bytes = buffer[*cursor..*cursor + 4].try_into().unwrap();
         *cursor += 4;
         Ok(u32::from_be_bytes(bytes))
+    }
+}
+impl MyDeserialize for u8 {
+    fn deserialize(buffer: &[u8], cursor: &mut usize) -> Result<Self, String> {
+        if *cursor + 1 > buffer.len() {
+            return Err("Unexpected End of File reading u8".to_string());
+        }
+        let bytes = buffer[*cursor..*cursor + 1].try_into().unwrap();
+        *cursor += 1;
+        Ok(u8::from_be_bytes(bytes))
     }
 }
 impl MyDeserialize for String {

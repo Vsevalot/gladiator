@@ -1,8 +1,6 @@
-use std::{collections::VecDeque, error::Error, f32::consts::PI, rc::Rc};
+use std::{collections::VecDeque, rc::Rc};
 
-use crate::{
-    animation::Animation, serialization::MyDeserialize, serialization::MySerialize, Field,
-};
+use crate::{serialization::MyDeserialize, serialization::MySerialize, Field};
 use macroquad::prelude::*;
 
 type ID = u32;
@@ -26,10 +24,6 @@ pub struct Entity {
     pub max_stamina: f32,
     pub stamina: f32,
     pub stamina_recovery_per_tick: f32,
-
-    pub walk_animation: Animation,
-    pub attack_animation: Animation,
-    pub footstep_tracker: FootstepTracker,
 }
 
 impl MySerialize for Entity {
@@ -50,10 +44,6 @@ impl MySerialize for Entity {
         self.max_stamina.serialize(buffer);
         self.stamina.serialize(buffer);
         self.stamina_recovery_per_tick.serialize(buffer);
-
-        self.walk_animation.serialize(buffer);
-        self.attack_animation.serialize(buffer);
-        self.footstep_tracker.serialize(buffer);
     }
 }
 impl MyDeserialize for Entity {
@@ -75,31 +65,51 @@ impl MyDeserialize for Entity {
             max_stamina: f32::deserialize(buffer, cursor)?,
             stamina: f32::deserialize(buffer, cursor)?,
             stamina_recovery_per_tick: f32::deserialize(buffer, cursor)?,
-
-            walk_animation: Animation::deserialize(buffer, cursor)?,
-            attack_animation: Animation::deserialize(buffer, cursor)?,
-
-            footstep_tracker: FootstepTracker::deserialize(buffer, cursor)?,
         })
+    }
+}
+
+impl MySerialize for Vec<Entity> {
+    fn serialize(&self, buffer: &mut Vec<u8>) {
+        buffer.extend_from_slice(&self.len().to_be_bytes());
+        for entity in self.iter() {
+            entity.serialize(buffer);
+        }
+    }
+}
+
+impl MyDeserialize for Vec<Entity> {
+    fn deserialize(buffer: &[u8], cursor: &mut usize) -> Result<Self, String> {
+        if *cursor + size_of::<usize>() > buffer.len() {
+            return Err("Unexpected End of File reading usize for Vec<Entity> length".to_string());
+        }
+        let number_of_enitites = usize::from_be_bytes(
+            buffer[*cursor..*cursor + size_of::<usize>()]
+                .try_into()
+                .unwrap(),
+        );
+        *cursor += size_of::<usize>();
+
+        let mut res = Vec::new();
+        for i in 0..number_of_enitites {
+            let entity = Entity::deserialize(buffer, cursor)?;
+            res.push(entity);
+        }
+
+        return Ok(res);
     }
 }
 
 impl Entity {
     pub fn tick(&mut self, global_tick: u32) {
         self.weapon.tick(global_tick);
-        self.footstep_tracker.tick(global_tick);
         self.stamina += self.stamina_recovery_per_tick;
         if self.stamina >= self.max_stamina {
             self.stamina = self.max_stamina;
         }
     }
 
-    pub fn make_gladiator(
-        position: Vec2,
-        walk_animation: Animation,
-        attack_animation: Animation,
-        step_texture: Rc<Texture2D>,
-    ) -> Self {
+    pub fn make_gladiator(position: Vec2) -> Self {
         return Self {
             id: 1,
             position: position,
@@ -109,23 +119,14 @@ impl Entity {
             hp: 100.0,
             direction_angle: 0.0,
             weapon: Weapon::SPEAR,
-            footstep_tracker: FootstepTracker::new(step_texture),
             mass: 100.0,
             max_stamina: 100.0,
             stamina: 100.0,
             stamina_recovery_per_tick: 1.0,
-            walk_animation: walk_animation,
-            attack_animation: attack_animation,
         };
     }
 
-    pub fn make_zombie(
-        id: ID,
-        pos: Vec2,
-        walk_animation: Animation,
-        attack_animation: Animation,
-        step_texture: Rc<Texture2D>,
-    ) -> Self {
+    pub fn make_zombie(id: ID, pos: Vec2) -> Self {
         return Self {
             id: id,
             position: pos,
@@ -135,13 +136,10 @@ impl Entity {
             hp: 30.0,
             direction_angle: 0.0,
             weapon: Weapon::BITE,
-            footstep_tracker: FootstepTracker::new(step_texture),
             mass: 10.0,
             max_stamina: 100.0,
             stamina: 100.0,
             stamina_recovery_per_tick: 1.0,
-            walk_animation: walk_animation,
-            attack_animation: attack_animation,
         };
     }
 
@@ -185,11 +183,6 @@ impl Entity {
 
     pub fn move_self(&mut self) {
         self.position += self.speed;
-        self.footstep_tracker.add_movement(
-            self.speed.length(),
-            self.position,
-            self.direction_angle,
-        );
         self.speed *= 0.3; // slowing down?...
     }
 
@@ -231,33 +224,6 @@ impl Entity {
         draw_circle(e_attack.x, field.height - e_attack.y, 5.0, weapon_color)
     }
 
-    pub fn draw_steps(&self, field: &Field, global_tick: u32) {
-        for step in self.footstep_tracker.footsteps.iter() {
-            draw_texture_ex(
-                &step.texture,
-                step.position.x - step.texture.width() / 2.0,
-                field.height - (step.position.y + step.texture.height() / 2.0),
-                Color {
-                    r: (1.0),
-                    g: (1.0),
-                    b: (1.0),
-                    a: (1.0
-                        - (global_tick - step.created_at_tick) as f32
-                            / self.footstep_tracker.footstep_lifetime as f32)
-                        - 0.5,
-                },
-                DrawTextureParams {
-                    dest_size: None,
-                    rotation: -step.direction_angle + PI / 2.0,
-                    source: None,
-                    flip_x: step.should_mirror,
-                    flip_y: false,
-                    pivot: None,
-                },
-            );
-        }
-    }
-
     pub fn draw_hitbox(&self, field: &Field) {
         draw_circle(
             self.position.x,
@@ -284,8 +250,8 @@ pub struct Weapon {
 impl MySerialize for WeaponState {
     fn serialize(&self, buffer: &mut Vec<u8>) {
         let (state, attacking_value) = match self {
-            WeaponState::Idle => (0, 0),
-            WeaponState::Attacking(v) => (1, *v),
+            WeaponState::Idle => (0 as u8, 0),
+            WeaponState::Attacking(v) => (1 as u8, *v),
         };
         state.serialize(buffer);
         attacking_value.serialize(buffer);
@@ -450,7 +416,7 @@ pub struct FootstepTracker {
 }
 
 impl FootstepTracker {
-    fn new(texture: Rc<Texture2D>) -> Self {
+    pub fn new(texture: Rc<Texture2D>) -> Self {
         return Self {
             distance_since_last: 0.0,
             current_direction_angle: 0.0,
@@ -462,13 +428,13 @@ impl FootstepTracker {
         };
     }
 
-    fn add_movement(&mut self, distance: f32, position: Vec2, direction_angle: f32) {
+    pub fn add_movement(&mut self, distance: f32, position: Vec2, direction_angle: f32) {
         self.distance_since_last += distance;
         self.current_direction_angle = direction_angle;
         self.current_position = position;
     }
 
-    fn tick(&mut self, global_tick: u32) {
+    pub fn tick(&mut self, global_tick: u32) {
         if self.distance_since_last >= self.distance_per_step {
             let mut should_mirror = false;
             if let Some(f) = self.footsteps.back() {

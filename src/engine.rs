@@ -47,6 +47,16 @@ impl Engine {
         return engine;
     }
 
+    pub fn get_entity(&self, id: u32) -> Option<Entity> {
+        for entity in self.get_entities() {
+            // TODO: refactor to map?
+            if entity.id == id {
+                return Some(entity.clone());
+            }
+        }
+        return None;
+    }
+
     pub fn attack_by_gladiator(&mut self) {
         self.gladiator.attack();
     }
@@ -176,7 +186,12 @@ impl Engine {
         }
     }
 
-    pub fn get_entities(&mut self) -> Vec<&mut Entity> {
+    pub fn get_entities(&self) -> Vec<&Entity> {
+        return std::iter::once(&self.gladiator)
+            .chain(self.zombies.iter())
+            .collect::<Vec<&Entity>>();
+    }
+    pub fn get_entities_mut(&mut self) -> Vec<&mut Entity> {
         return std::iter::once(&mut self.gladiator)
             .chain(self.zombies.iter_mut())
             .collect::<Vec<&mut Entity>>();
