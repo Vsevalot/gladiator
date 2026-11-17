@@ -218,14 +218,12 @@ async fn load_attack_animations() -> AnimationPack {
             TICKS_PER_FRAME * 2,
         ));
     }
-    let zombie_texture = Rc::new(load_texture("assets/textures/ai/zombie.png").await.unwrap());
-    let mut zombie_vec = vec![];
-    for i in 0..8 {
-        zombie_vec.push((
-            Rect::new(256.0 * (i as f32), 0.0, 256.0, 256.0),
-            TICKS_PER_FRAME * 2,
-        ));
-    }
+    let zombie_texture = Rc::new(
+        load_texture("assets/textures/real/zombie_walking.png")
+            .await
+            .unwrap(),
+    );
+    let zombie_vec = vec![(Rect::new(0.0, 0.0, 256.0, 256.0), TICKS_PER_FRAME)];
 
     return AnimationPack {
         gladiator_walk: ProtoAnimation {
@@ -297,28 +295,24 @@ async fn main() {
         engine.gladiator.id,
         Animation::new(annimation_pack.gladiator_attack),
     );
-    for id in range(2, 3, 4) {
-        attack_animations.insert(id, Animation::new(annimation_pack.zombie));
-    }
-
     let mut walk_animations = HashMap::<u32, Animation>::new();
     walk_animations.insert(
         engine.gladiator.id,
         Animation::new(annimation_pack.gladiator_walk),
     );
-    for id in range(2, 3, 4) {
-        walk_animations.insert(id, Animation::new(annimation_pack.zombie));
-    }
-
     let mut footstep_trackers = HashMap::<u32, FootstepTracker>::new();
     footstep_trackers.insert(
         engine.gladiator.id,
-        FootstepTracker::new(annimation_pack.gladiator_step_texture),
+        FootstepTracker::new(annimation_pack.gladiator_step_texture.clone()),
     );
-    for id in range(2, 3, 4) {
+
+    for id in 2..5 {
+        // TODO: introduce entity type to map on it
+        attack_animations.insert(id, Animation::new(annimation_pack.zombie.clone()));
+        walk_animations.insert(id, Animation::new(annimation_pack.zombie.clone()));
         footstep_trackers.insert(
             id,
-            FootstepTracker::new(annimation_pack.gladiator_step_texture),
+            FootstepTracker::new(annimation_pack.gladiator_step_texture.clone()),
         );
     }
 
@@ -353,32 +347,25 @@ async fn main() {
         while lag >= SEC_PER_UPDATE {
             engine.tick();
 
-            draw_all(
-                &engine,
-                &mut attack_animations,
-                &mut walk_animations,
-                &mut footstep_trackers,
-            );
-            for (id, previous_position) in entities_positions.iter_mut() {
-                let footstep_tracker = footstep_trackers.get_mut(id).unwrap(); // TODO: unite
-                                                                               // footstep_tracker and previous_position?
-                let entity = engine.get_entity(*id);
-
-                match entity {
-                    Some(e) => {
-                        let distance_travelled = (e.position - *previous_position).length();
-                        footstep_tracker.add_movement(
-                            distance_travelled,
-                            e.position,
-                            e.direction_angle,
-                        );
-                        *previous_position = e.position;
-                    }
-                    None => todo!(),
-                }
-            }
-
             lag -= SEC_PER_UPDATE;
+        }
+
+        draw_all(
+            &engine,
+            &mut attack_animations,
+            &mut walk_animations,
+            &mut footstep_trackers,
+        );
+        for (id, previous_position) in entities_positions.iter_mut() {
+            let footstep_tracker = footstep_trackers.get_mut(id).unwrap(); // TODO: unite
+                                                                           // footstep_tracker and previous_position?
+            let entity = engine.get_entity(*id);
+
+            if let Some(ref e) = entity {
+                let distance_travelled = (e.position - *previous_position).length();
+                footstep_tracker.add_movement(distance_travelled, e.position, e.direction_angle);
+                *previous_position = e.position;
+            }
         }
 
         next_frame().await

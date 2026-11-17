@@ -91,7 +91,7 @@ impl MyDeserialize for Vec<Entity> {
         *cursor += size_of::<usize>();
 
         let mut res = Vec::new();
-        for i in 0..number_of_enitites {
+        for _ in 0..number_of_enitites {
             let entity = Entity::deserialize(buffer, cursor)?;
             res.push(entity);
         }

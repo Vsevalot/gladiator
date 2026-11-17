@@ -218,11 +218,6 @@ impl Engine {
             .chain(self.zombies.iter())
             .collect::<Vec<&Entity>>();
     }
-    pub fn get_entities_mut(&mut self) -> Vec<&mut Entity> {
-        return std::iter::once(&mut self.gladiator)
-            .chain(self.zombies.iter_mut())
-            .collect::<Vec<&mut Entity>>();
-    }
 }
 
 impl MySerialize for Engine {
