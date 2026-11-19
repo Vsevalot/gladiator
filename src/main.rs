@@ -8,7 +8,7 @@ use std::io::{BufWriter, Write};
 
 use animation::Animation;
 use engine::{Engine, InputEvent};
-use entity::{Entity, TICKS_PER_FRAME};
+use entity::{Entity, ID, TICKS_PER_FRAME};
 use macroquad::prelude::*;
 
 pub const SPEED_TO_ANIMATE_WALK: f32 = 0.3;
@@ -293,17 +293,17 @@ async fn main() {
         make_zombies(),
         field.clone(),
     );
-    let mut attack_animations = HashMap::<u32, Animation>::new();
+    let mut attack_animations = HashMap::<ID, Animation>::new();
     attack_animations.insert(
         engine.gladiator.id,
         Animation::new(annimation_pack.gladiator_attack),
     );
-    let mut walk_animations = HashMap::<u32, Animation>::new();
+    let mut walk_animations = HashMap::<ID, Animation>::new();
     walk_animations.insert(
         engine.gladiator.id,
         Animation::new(annimation_pack.gladiator_walk),
     );
-    let mut footstep_trackers = HashMap::<u32, FootstepTracker>::new();
+    let mut footstep_trackers = HashMap::<ID, FootstepTracker>::new();
     footstep_trackers.insert(
         engine.gladiator.id,
         FootstepTracker::new(annimation_pack.gladiator_step_texture.clone()),

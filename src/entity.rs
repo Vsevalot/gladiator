@@ -3,7 +3,7 @@ use std::{collections::VecDeque, rc::Rc};
 use crate::{serialization::MyDeserialize, serialization::MySerialize, Field};
 use macroquad::prelude::*;
 
-type ID = u32;
+pub type ID = u32;
 const RADIUS: f32 = 50.0;
 
 #[derive(Debug, Clone, PartialEq)]
