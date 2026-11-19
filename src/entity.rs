@@ -6,7 +6,7 @@ use macroquad::prelude::*;
 type ID = u32;
 const RADIUS: f32 = 50.0;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Entity {
     pub id: ID,
 
@@ -49,23 +49,87 @@ impl MySerialize for Entity {
 impl MyDeserialize for Entity {
     fn deserialize(buffer: &[u8], cursor: &mut usize) -> Result<Self, String> {
         Ok(Entity {
-            id: u32::deserialize(buffer, cursor)?,
+            id: u32::deserialize(buffer, cursor).map_err(|e| format!("Entity.id: {e}"))?,
 
-            position: Vec2::deserialize(buffer, cursor)?,
-            speed: Vec2::deserialize(buffer, cursor)?,
-            mass: f32::deserialize(buffer, cursor)?,
-            radius: f32::deserialize(buffer, cursor)?,
-            direction_angle: f32::deserialize(buffer, cursor)?,
+            position: Vec2::deserialize(buffer, cursor)
+                .map_err(|e| format!("Entity.position: {e}"))?,
+            speed: Vec2::deserialize(buffer, cursor).map_err(|e| format!("Entity.speed: {e}"))?,
+            mass: f32::deserialize(buffer, cursor).map_err(|e| format!("Entity.mass: {e}"))?,
+            radius: f32::deserialize(buffer, cursor).map_err(|e| format!("Entity.radius: {e}"))?,
+            direction_angle: f32::deserialize(buffer, cursor)
+                .map_err(|e| format!("Entity.direction_angle: {e}"))?,
 
-            max_hp: f32::deserialize(buffer, cursor)?,
-            hp: f32::deserialize(buffer, cursor)?,
+            max_hp: f32::deserialize(buffer, cursor).map_err(|e| format!("Entity.max_hp: {e}"))?,
+            hp: f32::deserialize(buffer, cursor).map_err(|e| format!("Entity.hp: {e}"))?,
 
-            weapon: Weapon::deserialize(buffer, cursor)?,
+            weapon: Weapon::deserialize(buffer, cursor)
+                .map_err(|e| format!("Entity.weapon: {e}"))?,
 
-            max_stamina: f32::deserialize(buffer, cursor)?,
-            stamina: f32::deserialize(buffer, cursor)?,
-            stamina_recovery_per_tick: f32::deserialize(buffer, cursor)?,
+            max_stamina: f32::deserialize(buffer, cursor)
+                .map_err(|e| format!("Entity.max_stamina: {e}"))?,
+            stamina: f32::deserialize(buffer, cursor)
+                .map_err(|e| format!("Entity.stamina: {e}"))?,
+            stamina_recovery_per_tick: f32::deserialize(buffer, cursor)
+                .map_err(|e| format!("Entity.stamina_recovery_per_tick: {e}"))?,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn vecid_test() {
+        let first: Vec<ID> = vec![1, 2, 3];
+        let second: Vec<ID> = vec![1, 6, 3];
+
+        let mut buffer = Vec::<u8>::new();
+        first.serialize(&mut buffer);
+        second.serialize(&mut buffer);
+
+        let mut cursor: usize = 0;
+
+        let res_first = Vec::<ID>::deserialize(&buffer, &mut cursor).unwrap();
+        let res_second = Vec::<ID>::deserialize(&buffer, &mut cursor).unwrap();
+
+        assert_eq!(first, res_first);
+        assert_eq!(second, res_second);
+    }
+
+    #[test]
+    fn weapon_test() {
+        let first = Weapon::SPEAR;
+        let second = Weapon::BITE;
+
+        let mut buffer = Vec::<u8>::new();
+        first.serialize(&mut buffer);
+        second.serialize(&mut buffer);
+
+        let mut cursor: usize = 0;
+
+        let res_first = Weapon::deserialize(&buffer, &mut cursor).unwrap();
+        let res_second = Weapon::deserialize(&buffer, &mut cursor).unwrap();
+
+        assert_eq!(first, res_first);
+        assert_eq!(second, res_second);
+    }
+
+    #[test]
+    fn entity_test() {
+        let first = Entity::make_gladiator(Vec2::new(15.5, -71.8));
+        let second = Entity::make_gladiator(Vec2::new(-13.1, 66.6));
+
+        let mut buffer = Vec::<u8>::new();
+        first.serialize(&mut buffer);
+        second.serialize(&mut buffer);
+
+        let mut cursor: usize = 0;
+
+        let res_first = Entity::deserialize(&buffer, &mut cursor).unwrap();
+        let res_second = Entity::deserialize(&buffer, &mut cursor).unwrap();
+
+        assert_eq!(first, res_first);
+        assert_eq!(second, res_second);
     }
 }
 
@@ -234,7 +298,7 @@ impl Entity {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Weapon {
     state: WeaponState,
     cooldown_ticks: u32,
@@ -250,8 +314,8 @@ pub struct Weapon {
 impl MySerialize for WeaponState {
     fn serialize(&self, buffer: &mut Vec<u8>) {
         let (state, attacking_value) = match self {
-            WeaponState::Idle => (0 as u8, 0),
-            WeaponState::Attacking(v) => (1 as u8, *v),
+            WeaponState::Idle => (0 as u8, 0 as u32),
+            WeaponState::Attacking(v) => (1 as u8, *v as u32),
         };
         state.serialize(buffer);
         attacking_value.serialize(buffer);
@@ -259,8 +323,9 @@ impl MySerialize for WeaponState {
 }
 impl MyDeserialize for WeaponState {
     fn deserialize(buffer: &[u8], cursor: &mut usize) -> Result<Self, String> {
-        let state = u32::deserialize(buffer, cursor)?;
-        let attacking_value = u32::deserialize(buffer, cursor)?;
+        let state = u8::deserialize(buffer, cursor).map_err(|e| format!("Weapon.state: {e}"))?;
+        let attacking_value =
+            u32::deserialize(buffer, cursor).map_err(|e| format!("Weapon.attacking_value: {e}"))?;
         match state {
             0 => Ok(WeaponState::Idle),
             1 => Ok(WeaponState::Attacking(attacking_value)),
@@ -271,7 +336,7 @@ impl MyDeserialize for WeaponState {
 
 impl MySerialize for Vec<ID> {
     fn serialize(&self, buffer: &mut Vec<u8>) {
-        (self.len() as u32).serialize(buffer);
+        self.len().serialize(buffer);
         for i in self.iter() {
             i.serialize(buffer);
         }
@@ -279,10 +344,12 @@ impl MySerialize for Vec<ID> {
 }
 impl MyDeserialize for Vec<ID> {
     fn deserialize(buffer: &[u8], cursor: &mut usize) -> Result<Self, String> {
-        let length = u32::deserialize(buffer, cursor)?;
-        let mut v = Vec::with_capacity(length as usize);
+        let length = usize::deserialize(buffer, cursor)?;
+        let mut v = Vec::with_capacity(length);
         for i in 0..length {
-            v[i as usize] = u32::deserialize(buffer, cursor)?;
+            v.push(
+                u32::deserialize(buffer, cursor).map_err(|e| format!("Vec<ID>, index {i}: {e}"))?,
+            );
         }
         Ok(v)
     }
@@ -309,22 +376,28 @@ impl MySerialize for Weapon {
 impl MyDeserialize for Weapon {
     fn deserialize(buffer: &[u8], cursor: &mut usize) -> Result<Self, String> {
         Ok(Weapon {
-            state: WeaponState::deserialize(buffer, cursor)?,
-            cooldown_ticks: u32::deserialize(buffer, cursor)?,
-            damage_tick_start: u32::deserialize(buffer, cursor)?,
-            damage_tick_end: u32::deserialize(buffer, cursor)?,
-            damage: f32::deserialize(buffer, cursor)?,
-            stamina_cost: f32::deserialize(buffer, cursor)?,
-            range: f32::deserialize(buffer, cursor)?,
-            offset: f32::deserialize(buffer, cursor)?,
-            damaged_this_cycle: Vec::<ID>::deserialize(buffer, cursor)?,
+            state: WeaponState::deserialize(buffer, cursor)
+                .map_err(|e| format!("Weapon.state: {e}"))?,
+            cooldown_ticks: u32::deserialize(buffer, cursor)
+                .map_err(|e| format!("Weapon.cooldown_ticks: {e}"))?,
+            damage_tick_start: u32::deserialize(buffer, cursor)
+                .map_err(|e| format!("Weapon.damage_tick_start: {e}"))?,
+            damage_tick_end: u32::deserialize(buffer, cursor)
+                .map_err(|e| format!("Weapon.damage_tick_end: {e}"))?,
+            damage: f32::deserialize(buffer, cursor).map_err(|e| format!("Weapon.damage: {e}"))?,
+            stamina_cost: f32::deserialize(buffer, cursor)
+                .map_err(|e| format!("Weapon.stamina_cost: {e}"))?,
+            range: f32::deserialize(buffer, cursor).map_err(|e| format!("Weapon.range: {e}"))?,
+            offset: f32::deserialize(buffer, cursor).map_err(|e| format!("Weapon.offset: {e}"))?,
+            damaged_this_cycle: Vec::<ID>::deserialize(buffer, cursor)
+                .map_err(|e| format!("Weapon.damaged_this_cycle: {e}"))?,
         })
     }
 }
 
 pub const TICKS_PER_FRAME: u32 = 4;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum WeaponState {
     Idle,
     Attacking(u32),

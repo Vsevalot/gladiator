@@ -155,6 +155,23 @@ mod tests {
         assert_eq!(t, res_t);
         assert_eq!(f, res_f);
     }
+    #[test]
+    fn vec2_test() {
+        let t = Vec2::new(15.0, -3.71);
+        let f = Vec2::new(-33.31, 50.8868);
+
+        let mut buffer = Vec::<u8>::new();
+        t.serialize(&mut buffer);
+        f.serialize(&mut buffer);
+
+        let mut cursor: usize = 0;
+
+        let res_t = Vec2::deserialize(&buffer, &mut cursor).unwrap();
+        let res_f = Vec2::deserialize(&buffer, &mut cursor).unwrap();
+
+        assert_eq!(t, res_t);
+        assert_eq!(f, res_f);
+    }
 }
 
 impl MySerialize for usize {
@@ -183,11 +200,13 @@ impl MySerialize for u8 {
 }
 impl MyDeserialize for u8 {
     fn deserialize(buffer: &[u8], cursor: &mut usize) -> Result<Self, String> {
-        if *cursor + 1 > buffer.len() {
+        if *cursor + size_of::<u8>() > buffer.len() {
             return Err("Unexpected End of File reading u8".to_string());
         }
-        let bytes = buffer[*cursor..*cursor + 1].try_into().unwrap();
-        *cursor += 1;
+        let bytes = buffer[*cursor..*cursor + size_of::<u8>()]
+            .try_into()
+            .unwrap();
+        *cursor += size_of::<u8>();
         Ok(u8::from_be_bytes(bytes))
     }
 }
@@ -199,11 +218,13 @@ impl MySerialize for u32 {
 }
 impl MyDeserialize for u32 {
     fn deserialize(buffer: &[u8], cursor: &mut usize) -> Result<Self, String> {
-        if *cursor + 4 > buffer.len() {
+        if *cursor + size_of::<u32>() > buffer.len() {
             return Err("Unexpected End of File reading u32".to_string());
         }
-        let bytes = buffer[*cursor..*cursor + 4].try_into().unwrap();
-        *cursor += 4;
+        let bytes = buffer[*cursor..*cursor + size_of::<u32>()]
+            .try_into()
+            .unwrap();
+        *cursor += size_of::<u32>();
         Ok(u32::from_be_bytes(bytes))
     }
 }
@@ -264,8 +285,8 @@ impl MySerialize for Vec2 {
 impl MyDeserialize for Vec2 {
     fn deserialize(buffer: &[u8], cursor: &mut usize) -> Result<Self, String> {
         Ok(Vec2 {
-            x: f32::deserialize(buffer, cursor)?,
-            y: f32::deserialize(buffer, cursor)?,
+            x: f32::deserialize(buffer, cursor).map_err(|e| format!("Vec2.x: {e}"))?,
+            y: f32::deserialize(buffer, cursor).map_err(|e| format!("Vec2.y: {e}"))?,
         })
     }
 }
