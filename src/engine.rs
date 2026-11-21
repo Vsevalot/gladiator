@@ -233,7 +233,8 @@ impl MySerialize for Engine {
 impl MyDeserialize for Engine {
     fn deserialize(buffer: &[u8], cursor: &mut usize) -> Result<Self, String> {
         Ok(Engine {
-            gladiator: Entity::deserialize(buffer, cursor)?,
+            gladiator: Entity::deserialize(buffer, cursor)
+                .map_err(|e| format!("Engine.gladiator: {e}"))?,
             zombies: Vec::<Entity>::deserialize(buffer, cursor)?,
             field: Field::deserialize(buffer, cursor)?,
             game_ended: bool::deserialize(buffer, cursor)?,

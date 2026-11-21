@@ -3,6 +3,7 @@ mod engine;
 mod entity;
 mod serialization;
 
+use std::env;
 use std::fs::{read, File};
 use std::io::{BufWriter, Write};
 
@@ -22,7 +23,7 @@ use crate::{
     serialization::{MyDeserialize, MySerialize},
 };
 
-struct AnimationPack {
+struct ProtoAnimationPack {
     gladiator_attack: ProtoAnimation,
     gladiator_walk: ProtoAnimation,
     gladiator_step_texture: Rc<Texture2D>,
@@ -65,18 +66,13 @@ fn draw_interface(hp: f32, stamina: f32) {
     draw_text(format!("FPS: {}", get_fps()), 20.0, 60.0, 20.0, BLACK);
 }
 
-fn draw_all(
-    engine: &Engine,
-    entity_to_attack_animation: &mut HashMap<u32, Animation>,
-    entity_to_walking_animation: &mut HashMap<u32, Animation>,
-    entity_to_footstep_tracker: &mut HashMap<u32, FootstepTracker>,
-) {
+fn draw_all(engine: &Engine, animations: &mut AnimationPack) {
     clear_background(WHITE);
 
     for entity in engine.get_entities() {
-        let attack_animation = entity_to_attack_animation.get_mut(&entity.id).unwrap();
-        let walk_animation = entity_to_walking_animation.get_mut(&entity.id).unwrap();
-        let footstep_tracker = entity_to_footstep_tracker.get_mut(&entity.id).unwrap();
+        let attack_animation = animations.attack_animations.get_mut(&entity.id).unwrap();
+        let walk_animation = animations.walk_animations.get_mut(&entity.id).unwrap();
+        let footstep_tracker = animations.footstep_trackers.get_mut(&entity.id).unwrap();
         draw_entity(
             entity,
             &engine.field,
@@ -182,7 +178,7 @@ fn draw_steps(field: &Field, global_tick: u32, footstep_tracker: &mut FootstepTr
     }
 }
 
-async fn load_attack_animations() -> AnimationPack {
+async fn load_attack_animations() -> ProtoAnimationPack {
     let gladiator_walk_texture = Rc::new(
         load_texture("assets/textures/real/gladiator_walking.png")
             .await
@@ -228,7 +224,7 @@ async fn load_attack_animations() -> AnimationPack {
     );
     let zombie_vec = vec![(Rect::new(0.0, 0.0, 256.0, 256.0), TICKS_PER_FRAME)];
 
-    return AnimationPack {
+    return ProtoAnimationPack {
         gladiator_walk: ProtoAnimation {
             texture: gladiator_walk_texture,
             frames: walk_vec,
@@ -279,20 +275,15 @@ fn collect_inputs() -> Vec<InputEvent> {
     return inputs;
 }
 
-#[macroquad::main("Gladiator")]
-async fn main() {
-    let field = Field {
-        width: screen_width(),
-        height: screen_height(),
-    };
+struct AnimationPack {
+    attack_animations: HashMap<ID, Animation>,
+    walk_animations: HashMap<ID, Animation>,
+    footstep_trackers: HashMap<ID, FootstepTracker>,
+}
 
+async fn init_animations(engine: &Engine) -> AnimationPack {
     let annimation_pack = load_attack_animations().await;
 
-    let mut engine = Engine::new(
-        Entity::make_gladiator(Vec2 { x: 50.0, y: 50.0 }),
-        make_zombies(),
-        field.clone(),
-    );
     let mut attack_animations = HashMap::<ID, Animation>::new();
     attack_animations.insert(
         engine.gladiator.id,
@@ -310,7 +301,6 @@ async fn main() {
     );
 
     for id in 2..5 {
-        // TODO: introduce entity type to map on it
         attack_animations.insert(id, Animation::new(annimation_pack.zombie.clone()));
         walk_animations.insert(id, Animation::new(annimation_pack.zombie.clone()));
         footstep_trackers.insert(
@@ -318,6 +308,44 @@ async fn main() {
             FootstepTracker::new(annimation_pack.gladiator_step_texture.clone()),
         );
     }
+
+    return AnimationPack {
+        attack_animations,
+        walk_animations,
+        footstep_trackers,
+    };
+}
+
+#[macroquad::main("Gladiator")]
+async fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    let mode = &args[1];
+    let replay_path = "replay.bin";
+    match mode.as_str() {
+        "replay" => {
+            main_replay(replay_path).await;
+        }
+        "play" => {
+            main_play(replay_path).await;
+        }
+        _ => panic!("Unknown option."),
+    }
+}
+
+async fn main_replay(replay_path: &str) {
+    let field = Field {
+        width: screen_width(),
+        height: screen_height(),
+    };
+
+    let mut engine = Engine::new(
+        Entity::make_gladiator(Vec2 { x: 50.0, y: 50.0 }),
+        make_zombies(),
+        field.clone(),
+    );
+
+    let mut animations = init_animations(&engine).await;
 
     let mut entities_positions = HashMap::<u32, Vec2>::new();
     for entity in engine.get_entities() {
@@ -327,7 +355,7 @@ async fn main() {
     let mut previous = macroquad::time::get_time();
     let mut lag = 0.0;
 
-    let replay: Vec<u8> = read("replay.bin").unwrap();
+    let replay: Vec<u8> = read(replay_path).unwrap();
     let mut cursor: usize = 0;
 
     loop {
@@ -350,15 +378,11 @@ async fn main() {
         }
 
         // Drawing
-        draw_all(
-            &engine,
-            &mut attack_animations,
-            &mut walk_animations,
-            &mut footstep_trackers,
-        );
+        draw_all(&engine, &mut animations);
+
         for (id, previous_position) in entities_positions.iter_mut() {
-            let footstep_tracker = footstep_trackers.get_mut(id).unwrap(); // TODO: unite
-                                                                           // footstep_tracker and previous_position?
+            let footstep_tracker = animations.footstep_trackers.get_mut(id).unwrap(); // TODO: unite
+                                                                                      // footstep_tracker and previous_position?
             let entity = engine.get_entity(*id);
 
             if let Some(ref e) = entity {
@@ -372,107 +396,77 @@ async fn main() {
     }
 }
 
-// #[macroquad::main("Gladiator")]
-// async fn main() {
-//     let field = Field {
-//         width: screen_width(),
-//         height: screen_height(),
-//     };
-//
-//     let annimation_pack = load_attack_animations().await;
-//
-//     let mut engine = Engine::new(
-//         Entity::make_gladiator(Vec2 { x: 50.0, y: 50.0 }),
-//         make_zombies(),
-//         field.clone(),
-//     );
-//     let mut attack_animations = HashMap::<u32, Animation>::new();
-//     attack_animations.insert(
-//         engine.gladiator.id,
-//         Animation::new(annimation_pack.gladiator_attack),
-//     );
-//     let mut walk_animations = HashMap::<u32, Animation>::new();
-//     walk_animations.insert(
-//         engine.gladiator.id,
-//         Animation::new(annimation_pack.gladiator_walk),
-//     );
-//     let mut footstep_trackers = HashMap::<u32, FootstepTracker>::new();
-//     footstep_trackers.insert(
-//         engine.gladiator.id,
-//         FootstepTracker::new(annimation_pack.gladiator_step_texture.clone()),
-//     );
-//
-//     for id in 2..5 {
-//         // TODO: introduce entity type to map on it
-//         attack_animations.insert(id, Animation::new(annimation_pack.zombie.clone()));
-//         walk_animations.insert(id, Animation::new(annimation_pack.zombie.clone()));
-//         footstep_trackers.insert(
-//             id,
-//             FootstepTracker::new(annimation_pack.gladiator_step_texture.clone()),
-//         );
-//     }
-//
-//     let mut entities_positions = HashMap::<u32, Vec2>::new();
-//     for entity in engine.get_entities() {
-//         entities_positions.insert(entity.id, entity.position);
-//     }
-//
-//     let mut previous = macroquad::time::get_time();
-//     let mut lag = 0.0;
-//
-//     let file = File::create("replay.bin").unwrap();
-//     let mut writer = BufWriter::new(file);
-//     let mut replay = Vec::<u8>::new();
-//
-//     loop {
-//         let current = macroquad::time::get_time();
-//         let elapsed = current - previous;
-//         previous = current;
-//         lag += elapsed;
-//
-//         if is_key_down(KeyCode::R) {
-//             engine = Engine::new(
-//                 Entity::make_gladiator(Vec2 { x: 50.0, y: 50.0 }),
-//                 make_zombies(),
-//                 field.clone(),
-//             );
-//         }
-//         if is_key_down(KeyCode::Q) {
-//             break;
-//         }
-//
-//         let inputs = collect_inputs();
-//         engine.process_inputs(inputs);
-//
-//         while lag >= SEC_PER_UPDATE {
-//             engine.tick();
-//             engine.serialize(&mut replay);
-//
-//             lag -= SEC_PER_UPDATE;
-//         }
-//
-//         // Drawing
-//         draw_all(
-//             &engine,
-//             &mut attack_animations,
-//             &mut walk_animations,
-//             &mut footstep_trackers,
-//         );
-//         for (id, previous_position) in entities_positions.iter_mut() {
-//             let footstep_tracker = footstep_trackers.get_mut(id).unwrap(); // TODO: unite
-//                                                                            // footstep_tracker and previous_position?
-//             let entity = engine.get_entity(*id);
-//
-//             if let Some(ref e) = entity {
-//                 let distance_travelled = (e.position - *previous_position).length();
-//                 footstep_tracker.add_movement(distance_travelled, e.position, e.direction_angle);
-//                 *previous_position = e.position;
-//             }
-//         }
-//
-//         next_frame().await
-//     }
-//
-//     writer.write_all(&replay).unwrap();
-//     writer.flush().unwrap();
-// }
+async fn main_play(replay_path: &str) {
+    let field = Field {
+        width: screen_width(),
+        height: screen_height(),
+    };
+
+    let mut engine = Engine::new(
+        Entity::make_gladiator(Vec2 { x: 50.0, y: 50.0 }),
+        make_zombies(),
+        field.clone(),
+    );
+
+    let mut animations = init_animations(&engine).await;
+
+    let mut entities_positions = HashMap::<u32, Vec2>::new();
+    for entity in engine.get_entities() {
+        entities_positions.insert(entity.id, entity.position);
+    }
+
+    let mut previous = macroquad::time::get_time();
+    let mut lag = 0.0;
+
+    let file = File::create(replay_path).unwrap();
+    let mut writer = BufWriter::new(file);
+    let mut replay = Vec::<u8>::new();
+
+    loop {
+        let current = macroquad::time::get_time();
+        let elapsed = current - previous;
+        previous = current;
+        lag += elapsed;
+
+        if is_key_down(KeyCode::R) {
+            engine = Engine::new(
+                Entity::make_gladiator(Vec2 { x: 50.0, y: 50.0 }),
+                make_zombies(),
+                field.clone(),
+            );
+        }
+        if is_key_down(KeyCode::Q) {
+            break;
+        }
+
+        let inputs = collect_inputs();
+        engine.process_inputs(inputs);
+
+        while lag >= SEC_PER_UPDATE {
+            engine.tick();
+            engine.serialize(&mut replay);
+
+            lag -= SEC_PER_UPDATE;
+        }
+
+        // Drawing
+        draw_all(&engine, &mut animations);
+
+        for (id, previous_position) in entities_positions.iter_mut() {
+            let footstep_tracker = animations.footstep_trackers.get_mut(id).unwrap(); // TODO: unite
+                                                                                      // footstep_tracker and previous_position?
+            let entity = engine.get_entity(*id);
+
+            if let Some(ref e) = entity {
+                let distance_travelled = (e.position - *previous_position).length();
+                footstep_tracker.add_movement(distance_travelled, e.position, e.direction_angle);
+                *previous_position = e.position;
+            }
+        }
+
+        next_frame().await
+    }
+
+    writer.write_all(&replay).unwrap();
+    writer.flush().unwrap();
+}
