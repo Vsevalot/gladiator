@@ -119,7 +119,6 @@ fn draw_entity(
                 pivot: None,
             },
         );
-        attack_animation.tick();
     } else {
         let texture_sector = walk_animation.get_frame();
         let mut frame = walk_animation.get_frame();
@@ -145,13 +144,10 @@ fn draw_entity(
         if entity.speed.length() < SPEED_TO_ANIMATE_WALK {
             return;
         }
-
-        walk_animation.tick();
     }
 }
 
 fn draw_steps(field: &Field, global_tick: u32, footstep_tracker: &mut FootstepTracker) {
-    footstep_tracker.tick(global_tick); // should it happen here?
     for step in footstep_tracker.footsteps.iter() {
         draw_texture_ex(
             &step.texture,
@@ -316,6 +312,24 @@ async fn init_animations(engine: &Engine) -> AnimationPack {
     };
 }
 
+fn animations_tick(animations: &mut AnimationPack, engine: &Engine) {
+    for entity in engine.get_entities() {
+
+        if entity.is_attacking() {
+            let attack_animation = animations.attack_animations.get_mut(&entity.id).unwrap();
+            attack_animation.tick();
+        }
+
+        if entity.speed.length() >= SPEED_TO_ANIMATE_WALK {
+            let walk_animation = animations.walk_animations.get_mut(&entity.id).unwrap();
+            walk_animation.tick();
+        }
+
+        let footstep_tracker = animations.footstep_trackers.get_mut(&entity.id).unwrap();
+        footstep_tracker.tick(engine.global_tick);
+    }
+}
+
 #[macroquad::main("Gladiator")]
 async fn main() {
     let args: Vec<String> = env::args().collect();
@@ -370,6 +384,7 @@ async fn main_replay(replay_path: &str) {
 
         while lag >= SEC_PER_UPDATE {
             engine = Engine::deserialize(&replay, &mut cursor).unwrap();
+            animations_tick(&mut animations, &engine);
 
             lag -= SEC_PER_UPDATE;
         }
@@ -440,11 +455,13 @@ async fn main_play(replay_path: &str) {
         }
 
         let inputs = collect_inputs();
-        engine.process_inputs(inputs);
 
         while lag >= SEC_PER_UPDATE {
+            engine.process_inputs(&inputs);
             engine.tick();
             engine.serialize(&mut replay);
+
+            animations_tick(&mut animations, &engine);
 
             lag -= SEC_PER_UPDATE;
         }

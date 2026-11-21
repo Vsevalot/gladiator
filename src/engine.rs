@@ -66,7 +66,7 @@ impl Engine {
         return None;
     }
 
-    pub fn process_inputs(&mut self, inputs: Vec<InputEvent>) {
+    pub fn process_inputs(&mut self, inputs: &Vec<InputEvent>) {
         for inp in inputs.iter() {
             match inp {
                 InputEvent::MoveUp => self.gladiator.speed.y += 1.0,
